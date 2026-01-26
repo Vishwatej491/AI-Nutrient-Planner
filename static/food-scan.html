@@ -800,14 +800,18 @@
             await animateStep(2, 50);
 
             try {
+                console.log("Starting upload process...");
                 const formData = new FormData();
                 formData.append('file', selectedFile);
 
+                console.log("Sending request to /api/food/upload...");
                 const response = await fetch(`${API_BASE}/api/food/upload`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
+
+                console.log("Response status:", response.status);
 
                 // Check for auth error
                 if (response.status === 401) {
@@ -820,16 +824,18 @@
                 await animateStep(3, 75);
 
                 const data = await response.json();
+                console.log("Response data:", data);
 
                 if (response.ok) {
                     await animateStep(4, 100);
                     setTimeout(() => showResults(data), 500);
                 } else {
+                    console.error("Upload failed:", data);
                     throw new Error(data.detail || 'Analysis failed');
                 }
             } catch (err) {
                 console.error('Scan error:', err);
-                alert('Error: ' + err.message);
+                alert('Upload Error: ' + err.message);
                 statusBar.classList.remove('show');
                 scanBtn.disabled = false;
             }

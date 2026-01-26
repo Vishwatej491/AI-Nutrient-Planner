@@ -256,10 +256,10 @@ class UserProfile:
             conditions=conditions,
             allergens=data.get("allergens", []),
             daily_targets=targets,
-            age=data.get("age"),
+            age=int(data["age"]) if data.get("age") is not None else None,
             gender=data.get("gender"),
-            weight_kg=data.get("weight_kg"),
-            height_cm=data.get("height_cm"),
+            weight_kg=float(data["weight_kg"]) if data.get("weight_kg") is not None else None,
+            height_cm=float(data["height_cm"]) if data.get("height_cm") is not None else None,
             activity_level=activity,
             fitness_goal=data.get("fitness_goal"),
         )

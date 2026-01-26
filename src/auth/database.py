@@ -7,6 +7,7 @@ Simple, file-based, no external dependencies.
 
 import sqlite3
 import os
+import uuid
 from contextlib import contextmanager
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -62,6 +63,20 @@ def init_database():
                 status TEXT DEFAULT 'pending',
                 error_message TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        
+        # Meal logs table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS meal_logs (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                food_name TEXT,
+                nutrition TEXT,  -- JSON
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                source TEXT,
+                confidence REAL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
@@ -272,6 +287,108 @@ class UploadRepository:
                 "UPDATE uploads SET status = ?, error_message = ? WHERE id = ?",
                 (status, error_message, upload_id)
             )
+            conn.commit()
+
+
+class MealRepository:
+    """Repository for meal log operations."""
+    
+    @staticmethod
+    def _log_debug(msg: str):
+        try:
+            with open("db_ops.log", "a") as f:
+                f.write(f"{datetime.now().isoformat()} - {msg}\n")
+        except: pass
+
+    @staticmethod
+    def create(
+        user_id: str,
+        food_name: str,
+        nutrition: Dict[str, float],
+        source: str = "manual",
+        confidence: float = 1.0,
+        timestamp: datetime = None
+    ) -> bool:
+        """Log a new meal."""
+        try:
+            MealRepository._log_debug(f"CREATE START: {food_name} for {user_id}")
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                log_id = str(uuid.uuid4())
+                ts = timestamp or datetime.now()
+                
+                print(f"[DB DEBUG] Creating meal: {food_name} at {ts.isoformat()} for {user_id}")
+                
+                cursor.execute("""
+                    INSERT INTO meal_logs (id, user_id, food_name, nutrition, source, confidence, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    log_id,
+                    user_id,
+                    food_name,
+                    json.dumps(nutrition),
+                    source,
+                    confidence,
+                    ts.isoformat()
+                ))
+                conn.commit()
+                MealRepository._log_debug("CREATE SUCCESS")
+                print("[DB DEBUG] Meal saved successfully")
+                return True
+        except Exception as e:
+            MealRepository._log_debug(f"CREATE ERROR: {e}")
+            print(f"[DB] Error logging meal: {e}")
+            return False
+
+    @staticmethod
+    def get_today_meals(user_id: str) -> List[Dict[str, Any]]:
+        """Get meals logged today."""
+        # Filter in Python to avoid SQLite timezone/date parsing issues
+        target_date_prefix = datetime.now().strftime("%Y-%m-%d")
+        print(f"[DB DEBUG] Fetching meals for {user_id}. Target prefix: {target_date_prefix}")
+        MealRepository._log_debug(f"GET START: {user_id} prefix={target_date_prefix}")
+        
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # Just get recent meals
+            cursor.execute("""
+                SELECT * FROM meal_logs 
+                WHERE user_id = ? 
+                ORDER BY timestamp DESC
+                LIMIT 50
+            """, (user_id,))
+            
+            rows = cursor.fetchall()
+            print(f"[DB DEBUG] Found {len(rows)} raw candidate rows")
+            MealRepository._log_debug(f"GET RAW: Found {len(rows)} rows")
+            
+            results = []
+            for row in rows:
+                # Check if timestamp (string) starts with today's date
+                ts = row['timestamp'] # e.g. "2024-05-21T12:00:00.000"
+                
+                # Debug print first few chars
+                # print(f"  > Checking row: {ts}")
+                
+                if ts and ts.startswith(target_date_prefix):
+                    item = dict(row)
+                    # Safe JSON parse
+                    try:
+                        item['nutrition'] = json.loads(item['nutrition']) if item['nutrition'] else {}
+                    except:
+                        item['nutrition'] = {}
+                    results.append(item)
+            
+            print(f"[DB DEBUG] Returning {len(results)} valid matches for today")
+            MealRepository._log_debug(f"GET DONE: Returning {len(results)} matches")
+            return results
+
+    @staticmethod
+    def clear_meals(user_id: str):
+        """Clear meals for a user."""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM meal_logs WHERE user_id = ?", (user_id,))
             conn.commit()
 
 

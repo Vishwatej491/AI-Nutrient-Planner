@@ -232,6 +232,13 @@
             font-weight: 600;
         }
 
+        .vital-badge-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
         .status-badge.safe {
             background: var(--primary-light);
             color: var(--primary-dark);
@@ -356,19 +363,21 @@
         .macro-bar-fill {
             height: 100%;
             border-radius: 4px;
-            transition: width 0.5s ease;
+            transition: width 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            background: var(--primary);
+            /* Maintain green theme */
         }
 
         .macro-bar-fill.protein {
-            background: #3b82f6;
+            background: #10b981;
         }
 
         .macro-bar-fill.carbs {
-            background: #f59e0b;
+            background: #34d399;
         }
 
         .macro-bar-fill.fat {
-            background: #ef4444;
+            background: #6ee7b7;
         }
 
         .macro-bar-value {
@@ -440,6 +449,97 @@
         .action-card.priority {
             border-color: var(--warning);
             background: linear-gradient(135deg, #fffbeb, #ffffff);
+        }
+
+        /* Water Tracker Styles */
+        .water-card {
+            background: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+            border: 1px solid #bae6fd;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .water-progress-bg {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(14, 165, 233, 0.15);
+            transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+        }
+
+        .water-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .water-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(14, 165, 233, 0.2);
+        }
+
+        .water-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #0369a1;
+        }
+
+        .water-liters {
+            font-size: 14px;
+            color: #0ea5e9;
+            font-weight: 500;
+        }
+
+        .water-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 16px;
+        }
+
+        .water-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            border: 1px solid #bae6fd;
+            background: white;
+            color: #0369a1;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(186, 230, 253, 0.3);
+        }
+
+        .water-btn:hover {
+            background: #f0f9ff;
+            transform: scale(1.05);
+        }
+
+        .water-display {
+            flex: 1;
+        }
+
+        .water-count {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0369a1;
+        }
+
+        .water-remaining {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 2px;
         }
 
         .action-card-icon {
@@ -642,11 +742,14 @@
             <section class="health-summary">
                 <div class="health-card highlight">
                     <div class="health-card-header">
-                        <div class="health-card-icon">❤️</div>
-                        <span class="health-card-title">Safety Status</span>
+                        <div class="health-card-icon">🩺</div>
+                        <span class="health-card-title">Medical Vitals</span>
                     </div>
-                    <span class="status-badge safe" id="safetyBadge">✓ All Clear</span>
-                    <p class="health-card-sub" id="safetyMessage">No dietary concerns</p>
+                    <div class="vital-badge-container">
+                        <span class="status-badge safe" id="vitalGlucose">Glucose: --</span>
+                        <span class="status-badge safe" id="vitalCholesterol">Cholesterol: --</span>
+                    </div>
+                    <p class="health-card-sub" style="margin-top: 8px;">From your medical report</p>
                 </div>
 
                 <div class="health-card">
@@ -799,6 +902,25 @@
 
         <!-- Sidebar -->
         <aside class="sidebar">
+            <!-- Water Tracker -->
+            <div class="card water-card">
+                <div class="water-progress-bg" id="waterProgress" style="height: 0%"></div>
+                <div class="water-content">
+                    <div class="water-header">
+                        <span class="water-title">Water</span>
+                        <span class="water-liters" id="waterLiters">0L</span>
+                    </div>
+                    <div class="water-controls">
+                        <button class="water-btn" onclick="updateWater(-1)">−</button>
+                        <div class="water-display">
+                            <div class="water-count" id="waterCount">0 Cups</div>
+                            <div class="water-remaining" id="waterRemaining">8 Cups Remaining</div>
+                        </div>
+                        <button class="water-btn" onclick="updateWater(1)">+</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="card quick-stats">
                 <p class="section-title">Today's Stats</p>
                 <div id="statsContent">
@@ -854,6 +976,8 @@
         const token = localStorage.getItem('token');
         if (!token) window.location.href = 'login.html';
 
+        let userProfile = null; // Global profile storage
+
         const userName = localStorage.getItem('user_name') || 'User';
         document.getElementById('userName').textContent = userName;
         document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
@@ -901,12 +1025,15 @@
 
                 // Check if bio-metrics are missing
                 if (!data.bio_metrics || !data.bio_metrics.age || !data.bio_metrics.weight_kg) {
-                    console.log("Bio-metrics missing, forcing redirect to setup-profile.");
-                    window.location.href = 'setup-profile.html';
-                    return;
+                    console.log("Bio-metrics incomplete (age/weight missing). Dashboard will show basic view.");
+                    // No forced redirect - allow user to access dashboard and fixes via UI
                 }
 
+                userProfile = data; // Store globally
                 updateProfileUI(data);
+
+                // Load meals AFTER profile to ensure targets are ready
+                loadTodayMeals();
             } catch (err) {
                 console.error('Profile load error:', err);
             }
@@ -952,14 +1079,16 @@
 
             // Update vitals (from medical report)
             if (profile.vitals) {
-                const glucoseEl = document.getElementById('glucoseLevel');
-                const cholesterolEl = document.getElementById('cholesterol');
+                const glucose = profile.vitals.glucose_level;
+                const cholesterol = profile.vitals.cholesterol;
 
-                if (profile.vitals.glucose_level) {
-                    glucoseEl.textContent = profile.vitals.glucose_level + ' mg/dL';
+                if (glucose) {
+                    document.getElementById('glucoseLevel').textContent = glucose + ' mg/dL';
+                    document.getElementById('vitalGlucose').textContent = 'Glucose: ' + glucose;
                 }
-                if (profile.vitals.cholesterol) {
-                    cholesterolEl.textContent = profile.vitals.cholesterol + ' mg/dL';
+                if (cholesterol) {
+                    document.getElementById('cholesterol').textContent = cholesterol + ' mg/dL';
+                    document.getElementById('vitalCholesterol').textContent = 'Cholesterol: ' + cholesterol;
                 }
             }
         }
@@ -967,7 +1096,9 @@
         // Load today's meals from API
         async function loadTodayMeals() {
             try {
-                const response = await fetch('/api/meals/today', {
+                console.log("Loading meals from /api/meals/today...");
+                // Add timestamp to prevent caching
+                const response = await fetch(`/api/meals/today?t=${new Date().getTime()}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -976,11 +1107,17 @@
                     return;
                 }
 
-                if (!response.ok) return;
+                if (!response.ok) {
+                    console.error("Meal fetch failed:", response.status);
+                    return;
+                }
 
                 const data = await response.json();
-                updateNutritionUI(data.meals || []);
-                updateMealsUI(data.meals || []);
+                console.log("Received meals:", data);
+
+                const meals = data.meals || [];
+                updateNutritionUI(meals);
+                updateMealsUI(meals);
             } catch (err) {
                 console.error('Meals load error:', err);
             }
@@ -1000,39 +1137,60 @@
                 return;
             }
 
-            // Calculate totals from real data
+            // Calculate totals from real data (Robust Handling)
             const totals = meals.reduce((acc, meal) => {
-                const n = meal.nutrition || {};
-                acc.calories += n.calories || 0;
-                acc.protein += n.protein_g || 0;
-                acc.carbs += n.carbs_g || 0;
-                acc.fat += n.fat_g || 0;
+                let n = meal.nutrition || {};
+
+                // CRITICAL FIX: Handle stringified JSON from DB if not parsed by backend
+                if (typeof n === 'string') {
+                    try { n = JSON.parse(n); } catch (e) { n = {}; }
+                }
+
+                acc.calories += Number(n.calories || n.Calories || 0);
+                acc.protein += Number(n.protein_g || n.Protein || 0);
+                acc.carbs += Number(n.carbs_g || n.Carbs || 0);
+                acc.fat += Number(n.fat_g || n.Fat || 0);
                 return acc;
             }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
-            // Update UI with real values
-            document.getElementById('calorieValue').textContent = Math.round(totals.calories);
-            document.getElementById('nutritionStatus').textContent = `${count} meal${count > 1 ? 's' : ''} logged`;
-            document.getElementById('nutritionMessage').textContent = 'From scanned food images';
+            // Get targets (fallback to defaults if profile not loaded or invalid)
+            const targetCalories = Number(userProfile?.daily_targets?.calories || 2000);
+            const targetProtein = Number(userProfile?.daily_targets?.protein_g || 80);
+            const targetCarbs = Number(userProfile?.daily_targets?.carbs_g || 250);
+            const targetFat = Number(userProfile?.daily_targets?.fat_g || 65);
 
-            // Update calorie ring (assume 2000 goal)
-            const caloriePercent = Math.min(totals.calories / 2000, 1);
+            // Update UI with real values (Calorie / Target)
+            const currentCals = Math.round(Number(totals.calories || 0));
+            const goalCals = Math.round(Number(targetCalories));
+
+            document.getElementById('calorieValue').innerHTML = `
+                <div style="font-size: 24px; line-height: 1;">${currentCals}</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">/ ${goalCals}</div>
+            `;
+            document.getElementById('nutritionStatus').textContent = `${count} meal${count > 1 ? 's' : ''} logged`;
+            document.getElementById('nutritionMessage').textContent = 'Personalized for your profile';
+
+            // Update calorie ring (Dynamic Goal)
+            const caloriePercent = Math.min(totals.calories / targetCalories, 1);
             const circumference = 2 * Math.PI * 42;
             document.getElementById('calorieRing').setAttribute('stroke-dasharray',
                 `${caloriePercent * circumference} ${circumference}`);
 
-            // Update macro bars (assume goals: protein 80g, carbs 250g, fat 65g)
-            const proteinPercent = Math.min(totals.protein / 80 * 100, 100);
-            const carbsPercent = Math.min(totals.carbs / 250 * 100, 100);
-            const fatPercent = Math.min(totals.fat / 65 * 100, 100);
+            // Update macro bars
+            const proteinPercent = Math.min(totals.protein / targetProtein * 100, 100);
+            const carbsPercent = Math.min(totals.carbs / targetCarbs * 100, 100);
+            const fatPercent = Math.min(totals.fat / targetFat * 100, 100);
 
-            document.getElementById('proteinBar').style.width = proteinPercent + '%';
-            document.getElementById('carbsBar').style.width = carbsPercent + '%';
-            document.getElementById('fatBar').style.width = fatPercent + '%';
+            // Trigger animation with a small delay for visual pop
+            setTimeout(() => {
+                document.getElementById('proteinBar').style.width = proteinPercent + '%';
+                document.getElementById('carbsBar').style.width = carbsPercent + '%';
+                document.getElementById('fatBar').style.width = fatPercent + '%';
+            }, 100);
 
-            document.getElementById('proteinValue').textContent = `${Math.round(totals.protein)}g`;
-            document.getElementById('carbsValue').textContent = `${Math.round(totals.carbs)}g`;
-            document.getElementById('fatValue').textContent = `${Math.round(totals.fat)}g`;
+            document.getElementById('proteinValue').textContent = `${Math.round(totals.protein)} / ${Math.round(targetProtein)}g`;
+            document.getElementById('carbsValue').textContent = `${Math.round(totals.carbs)} / ${Math.round(targetCarbs)}g`;
+            document.getElementById('fatValue').textContent = `${Math.round(totals.fat)} / ${Math.round(targetFat)}g`;
 
             // Show AI note if needed
             if (totals.calories > 1800) {
@@ -1064,9 +1222,9 @@
             `).join('');
         }
 
-        // Load all data
+        // Load all data (Sequential)
         loadProfile();
-        loadTodayMeals();
+        // loadTodayMeals() is now called inside loadProfile on success
 
         // Particle Background
         const canvas = document.getElementById('bg-canvas');
@@ -1227,6 +1385,48 @@
 
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
+        // Water Tracking Logic
+        function initWaterTracker() {
+            const today = new Date().toDateString();
+            let waterData = JSON.parse(localStorage.getItem('waterTracker') || '{}');
+
+            // Reset if different day
+            if (waterData.lastUpdate !== today) {
+                waterData = { count: 0, lastUpdate: today };
+                localStorage.setItem('waterTracker', JSON.stringify(waterData));
+            }
+
+            refreshWaterUI(waterData.count);
+        }
+
+        function updateWater(delta) {
+            let waterData = JSON.parse(localStorage.getItem('waterTracker') || '{}');
+            waterData.count = Math.max(0, (waterData.count || 0) + delta);
+            waterData.lastUpdate = new Date().toDateString();
+            localStorage.setItem('waterTracker', JSON.stringify(waterData));
+            refreshWaterUI(waterData.count);
+        }
+
+        function refreshWaterUI(count) {
+            const goal = 8;
+            const litersPerCup = 0.25;
+            const percent = Math.min((count / goal) * 100, 100);
+
+            document.getElementById('waterCount').textContent = `${count} Cup${count !== 1 ? 's' : ''}`;
+            document.getElementById('waterLiters').textContent = `${(count * litersPerCup).toFixed(1)}L`;
+            document.getElementById('waterProgress').style.height = `${percent}%`;
+
+            const remaining = Math.max(0, goal - count);
+            document.getElementById('waterRemaining').textContent =
+                remaining > 0 ? `${remaining} Cup${remaining !== 1 ? 's' : ''} Remaining` : 'Goal Reached! ✨';
+        }
+
+        // Initialize dashboard when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            initWaterTracker();
+            loadProfile();
+            // ... (rest of initializations)
+        });
     </script>
 </body>
 

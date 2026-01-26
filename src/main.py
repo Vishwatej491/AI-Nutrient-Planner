@@ -4,6 +4,7 @@ FastAPI Application for AI Nutrition
 Provides REST API endpoints for:
 - Authentication (login, register)
 - Virtual Coach (chat)
+# RELOAD TRIGGER 1
 - Analytics (health score, trends, insights)
 - Food logging
 - Medical report upload with OCR
@@ -24,6 +25,9 @@ import os
 import sys
 import uuid
 import tempfile
+import re
+import json
+from dataclasses import asdict
 
 # Add src to path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -54,7 +58,7 @@ from coach.virtual_coach import VirtualCoach
 from analytics.analytics_service import AnalyticsService, MealLogStore
 from feedback.feedback_service import FeedbackService, FeedbackStore
 from auth.auth_service import auth_service
-from auth.database import MedicalProfileRepository, UploadRepository
+from auth.database import MedicalProfileRepository, UploadRepository, MealRepository
 from services.llm_service import get_mistral_service, get_llm_service
 from services.rag_service import get_rag_service
 from services.llm_service import get_mistral_service, get_llm_service
@@ -1353,14 +1357,73 @@ async def logout(user: dict = Depends(get_current_user)):
 # =============================================================================
 
 @app.get("/profile")
+@app.get("/api/profile")
 async def get_medical_profile(user: dict = Depends(get_current_user)):
-    """Get authenticated user's medical profile."""
-    profile = MedicalProfileRepository.get_by_user_id(user["sub"])
+    """Get authenticated user's medical profile with dynamic calorie targets."""
+    raw_profile = MedicalProfileRepository.get_by_user_id(user["sub"])
     
-    if not profile:
+    if not raw_profile:
         return {"message": "No profile found", "profile": None}
     
-    return profile
+    try:
+        # Wire up dynamic calculations
+        profile_obj = UserProfile.from_dict(raw_profile)
+        tdee = profile_obj.calculate_tdee()
+        
+        if tdee and tdee > 1000: # Sanity check
+            # Update targets based on Activity Level & Goal
+            # 1. Calc base target
+            target_calories = int(tdee)
+            
+            # Adjust for goal (UserProfile.fitness_goal)
+            goal = (profile_obj.fitness_goal or "").lower()
+            if "loss" in goal or "lose" in goal:
+                target_calories -= 500
+            elif "gain" in goal or "build" in goal:
+                target_calories += 300
+            
+            # Safety checks
+            if target_calories < 1200: target_calories = 1200
+            
+            # 2. Update the profile's daily targets
+            # Use specific factory methods if conditions exist, otherwise generic
+            if profile_obj.has_condition(HealthCondition.DIABETES):
+                profile_obj.daily_targets = DailyTargets.for_diabetes(base_calories=target_calories)
+            elif profile_obj.has_condition(HealthCondition.HYPERTENSION):
+                profile_obj.daily_targets = DailyTargets.for_hypertension(base_calories=target_calories)
+            elif "loss" in goal or profile_obj.has_condition(HealthCondition.OBESITY):
+                profile_obj.daily_targets = DailyTargets.for_weight_loss(base_calories=target_calories)
+            else:
+                # Manual macro distribution for maintenance/general
+                # 50% Carb, 20% Protein, 30% Fat
+                profile_obj.daily_targets = DailyTargets(
+                    calories=target_calories,
+                    protein_g=int(target_calories * 0.20 / 4),
+                    carbs_g=int(target_calories * 0.50 / 4),
+                    fat_g=int(target_calories * 0.30 / 9),
+                    # Keep default recommendations for others
+                )
+
+        # Merge back into response
+        response = raw_profile.copy()
+        response.update(profile_obj.to_dict())
+        response['daily_targets'] = asdict(profile_obj.daily_targets) if hasattr(profile_obj.daily_targets, '__dataclass_fields__') else profile_obj.daily_targets.__dict__
+        
+        # Ensure bio_metrics block exists for frontend (crucial for dashboard.html)
+        response['bio_metrics'] = {
+            "age": profile_obj.age,
+            "weight_kg": profile_obj.weight_kg,
+            "height_cm": profile_obj.height_cm,
+            "activity_level": profile_obj.activity_level.value if hasattr(profile_obj.activity_level, 'value') else str(profile_obj.activity_level),
+            "fitness_goal": profile_obj.fitness_goal,
+            "gender": profile_obj.gender or "male"
+        }
+        
+        return response
+
+    except Exception as e:
+        print(f"[PROFILE] Error calculating dynamic targets: {e}")
+        return raw_profile
 
 
 # =============================================================================
@@ -1698,7 +1761,16 @@ async def upload_food_image(
                     "confidence": final_confidence,
                 }
                 
-                # Save to user session
+                # Save to user session (Persistent DB)
+                MealRepository.create(
+                    user_id=user_id,
+                    food_name=meal_data["food_name"],
+                    nutrition=meal_data["nutrition"],
+                    source=meal_data["source"],
+                    confidence=meal_data["confidence"]
+                )
+                
+                # Also keep in-memory for immediate context if needed (optional)
                 if user_id not in user_meal_logs:
                     user_meal_logs[user_id] = []
                 user_meal_logs[user_id].append(meal_data)
@@ -1759,18 +1831,8 @@ async def get_today_meals(user: dict = Depends(get_current_user)):
     user_id = user["sub"]
     today = datetime.now().date()
     
-    if user_id not in user_meal_logs:
-        return {"meals": [], "message": "No meals logged yet"}
-    
-    # Filter to today's meals only
-    today_meals = []
-    for meal in user_meal_logs[user_id]:
-        try:
-            meal_date = datetime.fromisoformat(meal["timestamp"]).date()
-            if meal_date == today:
-                today_meals.append(meal)
-        except:
-            continue
+    # Get persistent meals from DB
+    today_meals = MealRepository.get_today_meals(user_id)
     
     return {
         "meals": today_meals,
@@ -1787,6 +1849,32 @@ async def clear_meals(user: dict = Depends(get_current_user)):
         user_meal_logs[user_id] = []
     return {"message": "Meals cleared"}
 
+
+@app.get("/api/debug/dump")
+async def debug_dump_meals(user: dict = Depends(get_current_user)):
+    """Dump ALL meals for debugging."""
+    user_id = user["sub"]
+    
+    # Import here to avoid circulars if any, though nicely imported at top
+    from auth.database import DB_PATH
+    
+    debug_info = {
+        "user_id": user_id,
+        "db_path_absolute": os.path.abspath(DB_PATH),
+        "db_exists": os.path.exists(DB_PATH),
+        "server_time": datetime.now().isoformat()
+    }
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM meal_logs WHERE user_id = ? ORDER BY timestamp DESC", (user_id,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        for r in rows:
+            try:
+                r['nutrition'] = json.loads(r['nutrition']) if r['nutrition'] else {}
+            except: pass
+            
+    return {"count": len(rows), "rows": rows, "debug_info": debug_info}
 
 @app.get("/api/food/current")
 async def get_current_food(user: dict = Depends(get_current_user)):
@@ -1883,11 +1971,16 @@ async def generate_recipe(
                 json_match = re.search(r'(\{.*\})', content, re.DOTALL)
                 if json_match:
                     data = json.loads(json_match.group(1))
-                    recipe_name = data.get("name") or data.get("recipe_name") or recipe_name
-                    ingredients_list = data.get("ingredients") or ingredients_list
-                    instructions_list = data.get("instructions") or data.get("steps") or []
+                    recipe_name = (data.get("name") or data.get("recipe_name") or recipe_name).replace('**', '').strip()
+                    
+                    raw_ingredients = data.get("ingredients") or []
+                    ingredients_list = [re.sub(r'^[ \-*•◦∙]+', '', str(i)).replace('**', '').strip() for i in raw_ingredients if str(i).strip()]
+                    
+                    raw_instructions = data.get("instructions") or data.get("steps") or []
+                    instructions_list = [re.sub(r'^([ \-*•◦∙]+|\d+[\.\)\:]\s*)', '', str(i)).replace('**', '').strip() for i in raw_instructions if str(i).strip()]
+                    
                     nutrition_data = data.get("nutrition") or nutrition_data
-                    health_note = data.get("health_note") or health_note
+                    health_note = (data.get("health_note") or health_note).replace('**', '').strip()
             except:
                 pass
 
@@ -1902,16 +1995,18 @@ async def generate_recipe(
                 sections = re.split(r'\n##?\s+', content)
                 
                 for section in sections:
-                    lines = [l.strip("- ").strip("123456789. ") for l in section.split('\n') if l.strip()]
+                    # Clean lines but don't strip leading digits globally (only for instructions)
+                    lines = [l.strip() for l in section.split('\n') if l.strip()]
                     if not lines: continue
                     
                     header = lines[0].lower()
                     
                     if "ingredient" in header:
-                        ingredients_list = lines[1:]
+                        # For ingredients: Strip symbols and also markdown bold markers (**)
+                        ingredients_list = [re.sub(r'^[ \-*•◦∙]+', '', l).replace('**', '').strip() for l in lines[1:] if l.strip()]
                     elif "instruction" in header or "preparation" in header or "method" in header or "step" in header:
-                        # Strip common prefixes like '1.', '2)', '-', etc.
-                        instructions_list = [re.sub(r'^[\d\.\-\)\s]+', '', l) for l in lines[1:] if l.strip()]
+                        # For instructions: Strip leading list markers AND markdown bold markers (**)
+                        instructions_list = [re.sub(r'^([ \-*•◦∙]+|\d+[\.\)\:]\s*)', '', l).replace('**', '').strip() for l in lines[1:] if l.strip()]
                     elif "nutrition" in header:
                         # Extract basic metrics from lines
                         for line in lines[1:]:
