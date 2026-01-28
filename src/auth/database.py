@@ -92,6 +92,9 @@ def init_database():
                 protein_g REAL DEFAULT 0,
                 carbs_g REAL DEFAULT 0,
                 fat_g REAL DEFAULT 0,
+                sugar_g REAL DEFAULT 0,
+                fiber_g REAL DEFAULT 0,
+                sodium_mg REAL DEFAULT 0,
                 water_cups INTEGER DEFAULT 0,
                 water_target INTEGER DEFAULT 8,
                 PRIMARY KEY (user_id, date),
@@ -106,7 +109,10 @@ def init_database():
             ("weight_kg", "REAL"),
             ("height_cm", "REAL"),
             ("activity_level", "TEXT"),
-            ("fitness_goal", "TEXT")
+            ("fitness_goal", "TEXT"),
+            ("sugar_g", "REAL"),
+            ("fiber_g", "REAL"),
+            ("sodium_mg", "REAL")
         ]
         
         for col_name, col_type in new_columns:
@@ -375,34 +381,24 @@ class MealRepository:
         
         with get_connection() as conn:
             cursor = conn.cursor()
-            # Just get recent meals
+            # Use SQL DATE function for more robust filtering
             cursor.execute("""
                 SELECT * FROM meal_logs 
-                WHERE user_id = ? 
+                WHERE user_id = ? AND DATE(timestamp) = DATE(?)
                 ORDER BY timestamp DESC
                 LIMIT 100
-            """, (user_id,))
+            """, (user_id, target_date_prefix))
             
             rows = cursor.fetchall()
-            print(f"[DB DEBUG] Found {len(rows)} raw candidate rows")
-            MealRepository._log_debug(f"GET RAW: Found {len(rows)} rows")
-            
             results = []
             for row in rows:
-                # Check if timestamp (string) starts with selected date
-                ts = row['timestamp'] # e.g. "2024-05-21T12:00:00.000"
-                
-                if ts and ts.startswith(target_date_prefix):
-                    item = dict(row)
-                    # Safe JSON parse
-                    try:
-                        item['nutrition'] = json.loads(item['nutrition']) if item['nutrition'] else {}
-                    except:
-                        item['nutrition'] = {}
-                    results.append(item)
+                item = dict(row)
+                try:
+                    item['nutrition'] = json.loads(item['nutrition']) if item['nutrition'] else {}
+                except:
+                    item['nutrition'] = {}
+                results.append(item)
             
-            print(f"[DB DEBUG] Returning {len(results)} valid matches for {target_date_prefix}")
-            MealRepository._log_debug(f"GET DONE: Returning {len(results)} matches")
             return results
 
     @staticmethod
@@ -452,6 +448,9 @@ class DailyLogRepository:
                 "protein_g": 0,
                 "carbs_g": 0,
                 "fat_g": 0,
+                "sugar_g": 0,
+                "fiber_g": 0,
+                "sodium_mg": 0,
                 "water_cups": 0,
                 "water_target": 8
             }
@@ -466,16 +465,22 @@ class DailyLogRepository:
             
             cursor.execute("""
                 UPDATE daily_logs SET
-                    calories_consumed = calories_consumed + ?,
-                    protein_g = protein_g + ?,
-                    carbs_g = carbs_g + ?,
-                    fat_g = fat_g + ?
+                    calories_consumed = COALESCE(calories_consumed, 0) + ?,
+                    protein_g = COALESCE(protein_g, 0) + ?,
+                    carbs_g = COALESCE(carbs_g, 0) + ?,
+                    fat_g = COALESCE(fat_g, 0) + ?,
+                    sugar_g = COALESCE(sugar_g, 0) + ?,
+                    fiber_g = COALESCE(fiber_g, 0) + ?,
+                    sodium_mg = COALESCE(sodium_mg, 0) + ?
                 WHERE user_id = ? AND date = ?
             """, (
-                nutrition.get('calories', 0),
-                nutrition.get('protein_g', 0),
-                nutrition.get('carbs_g', 0),
-                nutrition.get('fat_g', 0),
+                float(nutrition.get('calories', 0)),
+                float(nutrition.get('protein_g', 0)),
+                float(nutrition.get('carbs_g', 0)),
+                float(nutrition.get('fat_g', 0)),
+                float(nutrition.get('sugar_g', 0)),
+                float(nutrition.get('fiber_g', 0)),
+                float(nutrition.get('sodium_mg', 0)),
                 user_id,
                 date_str
             ))

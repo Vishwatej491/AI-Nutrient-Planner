@@ -1077,7 +1077,9 @@
         // Auth
         const token = localStorage.getItem('token');
         let userProfile = null;
-        let selectedDate = new Date().toISOString().split('T')[0];
+        // Initialize with local date (YYYY-MM-DD) instead of UTC to fix timezone mismatch
+        const now = new Date();
+        let selectedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
         // Ensure token exists
         if (!token) window.location.href = 'login.html';
@@ -1438,8 +1440,8 @@
                 return;
             }
 
-            // Show last 3 meals
-            const recentMeals = meals.slice(-3).reverse();
+            // Show THE 3 MOST RECENT meals (server returns DESC sorted)
+            const recentMeals = meals.slice(0, 3);
             container.innerHTML = recentMeals.map(meal => `
                 <div class="meal-item">
                     <div class="meal-icon">🍽️</div>

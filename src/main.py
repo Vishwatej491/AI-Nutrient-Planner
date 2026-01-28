@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import sys
 import uuid
@@ -1622,7 +1622,9 @@ def _load_food_database():
     food_db = {}
     
     # Try Indian food nutrition dataset first
-    csv_path = os.path.join(os.path.dirname(__file__), "..", "data", "FINAL_ACCURATE_FOOD_DATASET_WITH_CUISINE (1).csv")
+    csv_path = os.path.join(os.path.dirname(__file__), "..", "data", "food_nutrition_with_serving_category (1).csv")
+    if not os.path.exists(csv_path):
+        csv_path = os.path.join(os.path.dirname(__file__), "..", "data", "FINAL_ACCURATE_FOOD_DATASET_WITH_CUISINE (1).csv")
     if not os.path.exists(csv_path):
         csv_path = os.path.join(os.path.dirname(__file__), "..", "data", "Indian_Continental_Nutrition_With_Dal_Variants.csv")
     if not os.path.exists(csv_path):
@@ -1636,35 +1638,31 @@ def _load_food_database():
             reader = csv.DictReader(f)
             for row in reader:
                 # Support multiple formats
-                dish_name = row.get('Dish Name') or row.get('meal_name', '')
+                dish_name = row.get('Dish Name') or row.get('food name') or row.get('meal_name') or row.get('name', '')
                 if dish_name:
+                    dish_name = dish_name.strip()
                     # Extract food type keywords for fallback matches
-                    keywords = ['pasta', 'rice', 'salad', 'soup', 'curry', 'dal', 'roti', 'paratha', 'dosa', 'idli', 'biryani', 'pulao', 'kheer', 'halwa', 'sandwich', 'chapati', 'paneer', 'samosa', 'pakora']
+                    keywords = ['pasta', 'rice', 'salad', 'soup', 'curry', 'dal', 'roti', 'paratha', 'dosa', 'idli', 'biryani', 'pulao', 'kheer', 'halwa', 'sandwich', 'chapati', 'paneer', 'samosa', 'pakora', 'chicken', 'kebab', 'tikka', 'poha', 'vada', 'burger', 'pizza']
+                    
+                    # Standardized extraction
+                    nutrition_data = {
+                        "calories": float(row.get('calories (kcal)') or row.get('Calories (kcal)') or row.get('calories', 0) or 0),
+                        "protein_g": float(row.get('protein (g)') or row.get('Protein (g)') or row.get('protein_g', 0) or 0),
+                        "carbs_g": float(row.get('carbohydrates (g)') or row.get('Carbohydrates (g)') or row.get('carbs_g', 0) or 0),
+                        "fat_g": float(row.get('fats (g)') or row.get('Fats (g)') or row.get('fat_g', 0) or 0),
+                        "sugar_g": float(row.get('free sugar (g)') or row.get('Free Sugar (g)') or row.get('sugar_g', 0) or 0),
+                        "sodium_mg": float(row.get('sodium (mg)') or row.get('Sodium (mg)') or row.get('sodium_mg', 0) or 0),
+                        "fiber_g": float(row.get('fibre (g)') or row.get('Fibre (g)') or row.get('fiber_g', 0) or 0),
+                        "density": float(row.get('Density (g/cm3)') or row.get('density', 1.0) or 1.0),
+                    }
+                    
                     for keyword in keywords:
                         if keyword in dish_name.lower():
                             if keyword not in food_db:
-                                food_db[keyword] = {
-                                    "calories": float(row.get('Calories (kcal)', 0) or row.get('calories', 0) or 0),
-                                    "protein_g": float(row.get('Protein (g)', 0) or row.get('protein_g', 0) or 0),
-                                    "carbs_g": float(row.get('Carbohydrates (g)', 0) or row.get('carbs_g', 0) or 0),
-                                    "fat_g": float(row.get('Fats (g)', 0) or row.get('fat_g', 0) or 0),
-                                    "sugar_g": float(row.get('Free Sugar (g)', 0) or row.get('sugar_g', 0) or 0),
-                                    "sodium_mg": float(row.get('Sodium (mg)', 0) or row.get('sodium_mg', 0) or 0),
-                                    "fiber_g": float(row.get('Fibre (g)', 0) or row.get('fiber_g', 0) or 0),
-                                    "density": float(row.get('Density (g/cm3)', 0) or row.get('density', 1.0) or 1.0),
-                                }
+                                food_db[keyword] = nutrition_data
                     
                     # Also add full dish name for exact matches
-                    food_db[dish_name.lower()] = {
-                        "calories": float(row.get('Calories (kcal)', 0) or row.get('calories', 0) or 0),
-                        "protein_g": float(row.get('Protein (g)', 0) or row.get('protein_g', 0) or 0),
-                        "carbs_g": float(row.get('Carbohydrates (g)', 0) or row.get('carbs_g', 0) or 0),
-                        "fat_g": float(row.get('Fats (g)', 0) or row.get('fat_g', 0) or 0),
-                        "sugar_g": float(row.get('Free Sugar (g)', 0) or row.get('sugar_g', 0) or 0),
-                        "sodium_mg": float(row.get('Sodium (mg)', 0) or row.get('sodium_mg', 0) or 0),
-                        "fiber_g": float(row.get('Fibre (g)', 0) or row.get('fiber_g', 0) or 0),
-                        "density": float(row.get('Density (g/cm3)', 0) or row.get('density', 1.0) or 1.0),
-                    }
+                    food_db[dish_name.lower()] = nutrition_data
         print(f"[FOOD DB] Loaded {len(food_db)} food entries from {os.path.basename(csv_path)}")
     except Exception as e:
         print(f"[FOOD DB] Warning: Could not load CSV, using defaults: {e}")
@@ -1755,7 +1753,7 @@ async def upload_food_image(
                 
                 # 3. Keyword fallback if still no lookup
                 if not lookup:
-                    keywords = ['dal', 'curry', 'roti', 'paratha', 'rice', 'sandwich', 'pasta', 'salad']
+                    keywords = ['dal', 'curry', 'roti', 'paratha', 'rice', 'sandwich', 'pasta', 'salad', 'samosa', 'paneer', 'chicken', 'kebab', 'tikka', 'poha', 'vada', 'burger', 'pizza']
                     for kw in keywords:
                         if kw in final_food_name.lower() and kw in FOOD_DATABASE:
                             lookup = FOOD_DATABASE[kw]
@@ -1802,12 +1800,54 @@ async def upload_food_image(
                 print(f"[FOOD UPLOAD] ✓ Context updated for user {user_id}")
 
                 # Build final response
+                
+                # INTEGRATE RULE ENGINE FOR REAL-TIME SAFETY VERDICT
+                user_profile = get_user_profile_for_rules(user_id)
+                from rules.engine import Severity
+                
+                # Create Food object for evaluation
+                eval_food = Food(
+                    food_id=f"scan-{datetime.now().timestamp()}",
+                    name=final_food_name,
+                    serving_size=100.0,
+                    serving_unit="g",
+                    nutrition=NutritionInfo(
+                        calories=float(nutrition.get("calories", 0)),
+                        protein_g=float(nutrition.get("protein_g", 0)),
+                        carbs_g=float(nutrition.get("carbs_g", 0)),
+                        fat_g=float(nutrition.get("fat_g", 0)),
+                        sugar_g=float(nutrition.get("sugar_g", 0)),
+                        fiber_g=float(nutrition.get("fiber_g", 0)),
+                        sodium_mg=float(nutrition.get("sodium_mg", 0)),
+                    ),
+                    allergens=[] # registry handles fuzzy allergen checks via conditions
+                )
+                
+                rule_violations = rule_engine.evaluate(eval_food, user_profile)
+                verdict = rule_engine.get_final_verdict(rule_violations)
+                
+                # Map verdict to frontend labels
+                safety_label = "safe"
+                if verdict == Severity.BLOCK:
+                    safety_label = "danger" # Frontend uses 'danger' for red badge
+                elif verdict in [Severity.WARN, Severity.ALERT]:
+                    safety_label = "warning" # Frontend uses 'warning' for yellow/caution badge
+                
+                # Build formatted response for frontend (food-scan.html)
+                print(f"[FOOD UPLOAD] SUCCESS: {final_food_name} ({final_confidence:.2f}) - Verdict: {safety_label}")
+                
                 return {
                     "status": "success",
                     "food_name": final_food_name,
                     "confidence": final_confidence,
                     "resolution_type": "retrieval",
-                    "safety_verdict": "safe", 
+                    "safety": {
+                        "verdict": safety_label,
+                        "violations": [
+                            {"rule_id": v.rule_id, "message": v.message, "severity": v.severity.value} 
+                            for v in rule_violations
+                        ]
+                    },
                     "nutrition": {
                         "calories": float(nutrition.get("calories", 0)),
                         "protein_g": float(nutrition.get("protein_g", 0)),
@@ -1872,6 +1912,7 @@ async def clear_meals(user: dict = Depends(get_current_user)):
     return {"message": "Meals cleared"}
 
 
+@app.get("/api/daily-stats")
 async def get_daily_stats(date: Optional[str] = None, user: dict = Depends(get_current_user)):
     """Fetch aggregated daily stats for a specific date (defaults to today)."""
     user_id = user["sub"]

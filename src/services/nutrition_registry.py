@@ -45,6 +45,7 @@ class NutritionRegistry:
         
         # Priority list of CSV sources - prefer files with Cuisine/Food_Group columns
         src_candidates = [
+            data_dir / "food_nutrition_with_serving_category (1).csv",
             data_dir / "FINAL_ACCURATE_FOOD_DATASET_WITH_CUISINE (1).csv",
             data_dir / "FINAL_ACCURATE_FOOD_DATASET_WITH_CUISINE.csv",
             data_dir / "Indian_Continental_Nutrition_With_Dal_Variants.csv",
@@ -63,26 +64,29 @@ class NutritionRegistry:
                     reader = csv.DictReader(f)
                     for row in reader:
                         # Normalize keys for consistency across different CSV formats
-                        name = (row.get('Dish Name') or row.get('meal_name') or row.get('name', '')).strip()
+                        name = (row.get('food name') or row.get('Dish Name') or row.get('meal_name') or row.get('name', '')).strip()
                         if not name: continue
                         
                         # Get Cuisine and Food_Group (for hierarchical classification)
-                        cuisine = (row.get('Cuisine') or '').strip()
-                        food_group = (row.get('Food_Group') or '').strip()
+                        # New CSV uses 'Category', we map it to food_group if needed
+                        cuisine = (row.get('Cuisine') or 'Unknown').strip()
+                        food_group = (row.get('Food_Group') or row.get('Category') or 'Other').strip()
                         
                         # Store standardized entry with Cuisine/Food_Group
                         item = {
                             'name': name,
                             'cuisine': cuisine,
                             'food_group': food_group,
-                            'calories': float(row.get('Calories (kcal)', 0) or row.get('calories', 0) or 0),
-                            'protein_g': float(row.get('Protein (g)', 0) or row.get('protein_g', 0) or 0),
-                            'carbs_g': float(row.get('Carbohydrates (g)', 0) or row.get('carbs_g', 0) or 0),
-                            'fat_g': float(row.get('Fats (g)', 0) or row.get('fat_g', 0) or 0),
-                            'sugar_g': float(row.get('Free Sugar (g)', 0) or row.get('sugar_g', 0) or 0),
-                            'sodium_mg': float(row.get('Sodium (mg)', 0) or row.get('sodium_mg', 0) or 0),
-                            'fiber_g': float(row.get('Fibre (g)', 0) or row.get('fiber_g', 0) or 0),
-                            'density': float(row.get('Density (g/cm3)', 0) or row.get('density', 1.0) or 1.0),
+                            'calories': float(row.get('calories (kcal)') or row.get('Calories (kcal)') or row.get('calories', 0) or 0),
+                            'protein_g': float(row.get('protein (g)') or row.get('Protein (g)') or row.get('protein_g', 0) or 0),
+                            'carbs_g': float(row.get('carbohydrates (g)') or row.get('Carbohydrates (g)') or row.get('carbs_g', 0) or 0),
+                            'fat_g': float(row.get('fats (g)') or row.get('Fats (g)') or row.get('fat_g', 0) or 0),
+                            'sugar_g': float(row.get('free sugar (g)') or row.get('Free Sugar (g)') or row.get('sugar_g', 0) or 0),
+                            'sodium_mg': float(row.get('sodium (mg)') or row.get('Sodium (mg)') or row.get('sodium_mg', 0) or 0),
+                            'fiber_g': float(row.get('fibre (g)') or row.get('Fibre (g)') or row.get('fiber_g', 0) or 0),
+                            'calcium_mg': float(row.get('calcium (mg)') or 0),
+                            'iron_mg': float(row.get('iron (mg)') or 0),
+                            'density': float(row.get('Density (g/cm3)') or row.get('density', 1.0) or 1.0),
                         }
                         
                         self._data.append(item)
@@ -139,23 +143,39 @@ class NutritionRegistry:
         return None
         
     def fuzzy_search(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """Find items matching the query."""
+        """Find items matching the query using token-based scoring."""
         query = query.lower().strip()
-        results = []
+        if not query: return []
         
-        # 1. Start with exact/starts-with
+        query_tokens = set(query.split())
+        scored_results = []
+        
         for name, row in self._indexed_data.items():
-            if name == query or name.startswith(query):
-                results.append(row)
-                if len(results) >= limit: return results
-                
-        # 2. Contains
-        for name, row in self._indexed_data.items():
-            if query in name and row not in results:
-                results.append(row)
-                if len(results) >= limit: return results
-                
-        return results
+            name_tokens = set(name.split())
+            
+            # Calculate match score
+            # 1. Exact match (bonus)
+            if name == query:
+                score = 100
+            # 2. Query is part of name
+            elif query in name:
+                score = 80
+            # 3. Token overlap
+            else:
+                intersection = query_tokens.intersection(name_tokens)
+                if not intersection:
+                    continue
+                # Score based on percentage of query tokens matched
+                score = (len(intersection) / len(query_tokens)) * 50
+                # Small bonus for matching more name tokens (more specific)
+                score += (len(intersection) / len(name_tokens)) * 10
+            
+            scored_results.append((score, row))
+        
+        # Sort by score descending
+        scored_results.sort(key=lambda x: x[0], reverse=True)
+        
+        return [r[1] for r in scored_results[:limit]]
     
     def get_by_cuisine_and_food_group(self, cuisine: str, food_group: str) -> Optional[Dict[str, float]]:
         """

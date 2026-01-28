@@ -71,6 +71,7 @@ class VirtualCoach:
             r"should i (?:eat|avoid|skip)",
             r"safe for (?:me|my)",
             r"okay for (?:me|my|diabetic|hypertension)",
+            r"i (?:am |want to )?(?:eat|having|eating)",
         ],
         IntentType.EXERCISE_BURN: [
             r"how (?:much|long) (?:to |exercise |walk |run )?burn",
@@ -479,18 +480,27 @@ class VirtualCoach:
         if context.active_violations:
             verdict = self.rule_engine.get_final_verdict(context.active_violations)
             
-            # If there are BLOCK violations, response MUST reflect that
-            if verdict == Severity.BLOCK and response.safety_level not in ["blocked"]:
-                return RawResponse(
-                    message=self._format_block_response(
-                        context.current_food, 
-                        context.active_violations
-                    ),
-                    safety_level="blocked",
-                    violations=context.active_violations,
-                    confidence=1.0,
-                    override_reason="Medical safety rule applied",
-                )
+            # Map verdict to safety_level string
+            severity_map = {
+                Severity.BLOCK: "blocked",
+                Severity.ALERT: "caution",
+                Severity.WARN: "caution",
+                Severity.ALLOW: "safe"
+            }
+            
+            mapped_safety = severity_map.get(verdict, "unknown")
+            
+            # Priority override: if rules found issues, response must reflect them
+            if verdict != Severity.ALLOW:
+                # If current response is too optimistic, override it
+                if response.safety_level in ["safe", "unknown"] or (verdict == Severity.BLOCK and response.safety_level != "blocked"):
+                    return RawResponse(
+                        message=self._format_caution_response(context.current_food, context.active_violations) if verdict != Severity.BLOCK else self._format_block_response(context.current_food, context.active_violations),
+                        safety_level=mapped_safety,
+                        violations=context.active_violations,
+                        confidence=1.0,
+                        override_reason="Medical safety rule applied",
+                    )
         
         return response
     
