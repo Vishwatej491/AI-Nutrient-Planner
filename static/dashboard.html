@@ -865,6 +865,31 @@
                 </div>
             </section>
 
+            <!-- 30-Day Weight Forecast -->
+            <section class="nutrition-snapshot" style="margin-top: 24px;">
+                <p class="section-title">📉 30-Day Weight Forecast (ML-Powered)</p>
+                <div class="grid" style="display: grid; grid-template-columns: 1fr; gap: 16px; max-width: 500px;">
+                    <div class="card" style="border-left: 4px solid var(--primary);">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <div style="font-size: 13px; color: var(--text-muted); text-transform: uppercase;">
+                                    Predicted Weight</div>
+                                <div style="font-size: 28px; font-weight: 700;" id="forecastWeight">-- kg</div>
+                                <div style="font-size: 14px; color: var(--primary-dark); font-weight: 600;"
+                                    id="forecastChange">-- kg expected</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="status-badge safe" id="forecastStatus" style="font-size: 11px;">Analyzing...
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Target: 30 Days
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
             <!-- Date Selector -->
             <div class="date-selector-bar">
                 <span class="date-label">📅 Selected Date:</span>
@@ -1116,6 +1141,7 @@
 
                 // Load summary stats and meals for the selected date
                 loadDashboardData();
+                loadWeightForecast();
             } catch (err) {
                 console.error('Profile load error:', err);
             }
@@ -1295,6 +1321,31 @@
                     <span class="stat-value">${stats.water_cups} Cups</span>
                 </div>
             `;
+        }
+
+        async function loadWeightForecast() {
+            try {
+                const response = await fetch('/api/analytics/weight-forecast', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const f = data.forecast;
+
+                document.getElementById('forecastWeight').textContent = `${f.predicted_weight} kg`;
+                const changeSign = f.weight_change >= 0 ? '+' : '';
+                document.getElementById('forecastChange').textContent = `${changeSign}${f.weight_change} kg expected`;
+                document.getElementById('forecastStatus').textContent = f.status;
+
+                // Color based on status
+                const statusEl = document.getElementById('forecastStatus');
+                statusEl.className = 'status-badge ' + (f.status === 'On track' ? 'safe' : (f.status === 'Stable' ? 'pending' : 'warning'));
+
+
+            } catch (err) {
+                console.error('Forecast load error:', err);
+            }
         }
 
         function updateNutritionUI(meals) {

@@ -64,8 +64,7 @@ from auth.database import (
 )
 from services.llm_service import get_mistral_service, get_llm_service
 from services.rag_service import get_rag_service
-from services.llm_service import get_mistral_service, get_llm_service
-from services.rag_service import get_rag_service
+from analytics.weight_forecaster import get_weight_forecaster
 # Legacy pipeline removed
 from services.continental_retrieval import get_continental_retrieval_system
 from services.nutrition_registry import get_nutrition_registry
@@ -156,6 +155,7 @@ meal_log_store = MealLogStore()
 analytics_service = AnalyticsService(meal_log_store)
 feedback_service = FeedbackService()
 virtual_coach = VirtualCoach(rule_engine, demo_user)
+weight_forecaster = get_weight_forecaster()
 
 
 # =============================================================================
@@ -2165,6 +2165,65 @@ async def get_analytics_summary(user: dict = Depends(get_current_user)):
             "calories": "decreasing",
             "protein": "stable",
             "sugar": "decreasing"
+        }
+    }
+
+
+@app.get("/api/analytics/weight-forecast")
+async def get_weight_forecast(user: dict = Depends(get_current_user)):
+    """
+    Predict 30-day weight forecast based on user's current metrics.
+    """
+    user_id = user["sub"]
+    
+    # Get user profile for current weight and activity level
+    profile = MedicalProfileRepository.get_by_user_id(user_id)
+    if not profile or not profile.get("weight_kg"):
+        # Use defaults if profile incomplete
+        current_weight = 75.0
+        activity_level = 1.2
+    else:
+        current_weight = float(profile.get("weight_kg"))
+        activity_level_map = {
+            "sedentary": 1.2,
+            "lightly_active": 1.375,
+            "moderately_active": 1.55,
+            "very_active": 1.725,
+            "extra_active": 1.9
+        }
+        activity_level = activity_level_map.get(profile.get("activity_level", "sedentary"), 1.2)
+    
+    # Get recent calorie delta from daily logs
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=6)
+    
+    total_delta = 0
+    days_with_data = 0
+    
+    for i in range(7):
+        date_str = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+        log = DailyLogRepository.get_or_create(user_id, date_str)
+        if log.get("calories_consumed", 0) > 0:
+            # Delta = Consumed - (Target + Burned)
+            delta = log["calories_consumed"] - (log["calories_target"] + log["calories_burned"])
+            total_delta += delta
+            days_with_data += 1
+            
+    avg_delta = total_delta / days_with_data if days_with_data > 0 else 0
+    
+    # Run prediction
+    forecast = weight_forecaster.predict_30_day_forecast(
+        current_weight=current_weight,
+        avg_daily_delta=avg_delta,
+        activity_level=activity_level
+    )
+    
+    return {
+        "forecast": forecast,
+        "input_summary": {
+            "avg_daily_delta": round(avg_delta, 1),
+            "activity_level": activity_level,
+            "days_analyzed": days_with_data
         }
     }
 
