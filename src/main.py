@@ -68,6 +68,8 @@ from analytics.weight_forecaster import get_weight_forecaster
 # Legacy pipeline removed
 from services.continental_retrieval import get_continental_retrieval_system
 from services.nutrition_registry import get_nutrition_registry
+from services.meal_planner import WeeklyPlanGenerator, GroceryGenerator
+from services.analytics_engine import AnalyticsEngine
 
 # =============================================================================
 # APP SETUP
@@ -2317,6 +2319,80 @@ async def get_weight_forecast(user: dict = Depends(get_current_user)):
             "days_analyzed": days_with_data
         }
     }
+
+
+# =============================================================================
+# ROUTES: MEAL PLANNING & GROCERY LISTS
+# =============================================================================
+
+from auth.database import WeeklyPlanRepository
+meal_planner = WeeklyPlanGenerator()
+grocery_gen = GroceryGenerator()
+
+@app.post("/api/meal-plan/generate")
+async def generate_meal_plan(user: dict = Depends(get_current_user)):
+    """Generate a new weekly meal plan for the user."""
+    user_id = user["sub"]
+    try:
+        plan = meal_planner.generate_plan(user_id)
+        return {"status": "success", "plan": plan}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        print(f"[API] Meal plan generation failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate meal plan")
+
+@app.get("/api/meal-plan/current")
+async def get_current_meal_plan(user: dict = Depends(get_current_user)):
+    """Retrieve the latest weekly meal plan."""
+    user_id = user["sub"]
+    plan_record = WeeklyPlanRepository.get_latest(user_id)
+    
+    if not plan_record:
+        return {"has_plan": False, "message": "No active meal plan found."}
+    
+    return {
+        "has_plan": True, 
+        "plan": plan_record["plan"],
+        "start_date": plan_record["start_date"],
+        "id": plan_record["id"]
+    }
+
+@app.get("/api/grocery-list")
+async def get_grocery_list(user: dict = Depends(get_current_user)):
+    """Generate a grocery list from the current meal plan."""
+    user_id = user["sub"]
+    plan_record = WeeklyPlanRepository.get_latest(user_id)
+    
+    if not plan_record:
+        raise HTTPException(status_code=404, detail="No active meal plan found")
+    
+    grocery_list = grocery_gen.generate_list(plan_record["plan"])
+    return {"status": "success", "grocery_list": grocery_list}
+
+
+# =============================================================================
+# ROUTES: ANALYTICS (EXTENDED)
+# =============================================================================
+
+@app.get("/api/analytics/meal-prediction")
+async def get_meal_prediction(user: dict = Depends(get_current_user)):
+    """Predict next meal time and type."""
+    engine = AnalyticsEngine(user["sub"])
+    prediction = engine.predict_next_meal()
+    return prediction
+
+@app.get("/api/analytics/calorie-budget")
+async def get_calorie_budget(user: dict = Depends(get_current_user)):
+    """Predict current calorie budget status."""
+    engine = AnalyticsEngine(user["sub"])
+    return engine.get_calorie_forecast()
+
+@app.get("/api/analytics/weight-trajectory")
+async def get_weight_trajectory(user: dict = Depends(get_current_user)):
+    """Predict weight trajectory."""
+    engine = AnalyticsEngine(user["sub"])
+    return engine.predict_weight_trajectory()
 
 
 # =============================================================================

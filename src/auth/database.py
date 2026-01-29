@@ -101,6 +101,43 @@ def init_database():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
+
+        # Weight history table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS weight_history (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                weight_kg REAL NOT NULL,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                source TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
+        # Nutrient targets table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS nutrient_targets (
+                user_id TEXT PRIMARY KEY,
+                vitamin_c_mg REAL DEFAULT 90,
+                calcium_mg REAL DEFAULT 1000,
+                iron_mg REAL DEFAULT 18,
+                fiber_g REAL DEFAULT 25,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
+        # Weekly plans table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS weekly_plans (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                plan_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
         
         # Migrations: Add new columns if they don't exist
         new_columns = [
@@ -560,6 +597,123 @@ class DailyLogRepository:
                 WHERE user_id = ? AND date = ?
             """, (calories, user_id, date_str))
             conn.commit()
+
+
+class WeightHistoryRepository:
+    """Repository for weight history tracking."""
+    
+    @staticmethod
+    def create(user_id: str, weight_kg: float, source: str = "manual") -> bool:
+        """Record a weight entry."""
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO weight_history (id, user_id, weight_kg, source)
+                    VALUES (?, ?, ?, ?)
+                """, (str(uuid.uuid4()), user_id, weight_kg, source))
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"[DB] Error recording weight: {e}")
+            return False
+
+    @staticmethod
+    def get_history(user_id: str, limit: int = 30) -> List[Dict[str, Any]]:
+        """Get weight history for a user."""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM weight_history 
+                WHERE user_id = ? 
+                ORDER BY recorded_at DESC 
+                LIMIT ?
+            """, (user_id, limit))
+            return [dict(row) for row in cursor.fetchall()]
+
+
+class NutrientTargetsRepository:
+    """Repository for managing nutrient targets (RDA)."""
+    
+    @staticmethod
+    def get_by_user_id(user_id: str) -> Dict[str, float]:
+        """Get nutrient targets for a user."""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM nutrient_targets WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            
+            # Create default targets if not exists
+            cursor.execute("INSERT INTO nutrient_targets (user_id) VALUES (?)", (user_id,))
+            conn.commit()
+            return {
+                "user_id": user_id,
+                "vitamin_c_mg": 90,
+                "calcium_mg": 1000,
+                "iron_mg": 18,
+                "fiber_g": 25
+            }
+
+    @staticmethod
+    def update(user_id: str, targets: Dict[str, float]) -> bool:
+        """Update nutrient targets."""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            updates = []
+            values = []
+            for k, v in targets.items():
+                if k in ["vitamin_c_mg", "calcium_mg", "iron_mg", "fiber_g"]:
+                    updates.append(f"{k} = ?")
+                    values.append(v)
+            
+            if updates:
+                updates.append("updated_at = ?")
+                values.append(datetime.now().isoformat())
+                values.append(user_id)
+                cursor.execute(
+                    f"UPDATE nutrient_targets SET {', '.join(updates)} WHERE user_id = ?",
+                    values
+                )
+                conn.commit()
+                return True
+            return False
+
+
+class WeeklyPlanRepository:
+    """Repository for weekly meal plans."""
+    
+    @staticmethod
+    def create(user_id: str, start_date: str, plan: Dict[str, Any]) -> str:
+        """Save a new weekly plan."""
+        plan_id = str(uuid.uuid4())
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO weekly_plans (id, user_id, start_date, plan_json)
+                VALUES (?, ?, ?, ?)
+            """, (plan_id, user_id, start_date, json.dumps(plan)))
+            conn.commit()
+            return plan_id
+
+    @staticmethod
+    def get_latest(user_id: str) -> Optional[Dict[str, Any]]:
+        """Get the latest weekly plan for a user."""
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM weekly_plans 
+                WHERE user_id = ? 
+                ORDER BY start_date DESC, created_at DESC 
+                LIMIT 1
+            """, (user_id,))
+            row = cursor.fetchone()
+            if row:
+                res = dict(row)
+                res['plan'] = json.loads(res['plan_json'])
+                return res
+            return None
 
 
 # Initialize database on import

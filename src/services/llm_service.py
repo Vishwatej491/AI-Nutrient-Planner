@@ -136,6 +136,16 @@ Rules:
 - If nothing is found in a category, return an empty list or null values.
 - IMPORTANT: If you see a test name (e.g., "Glucose fasting") followed by a number, that number is the value.
 - Be precise. Do not hallucinate information not in the text.
+""",
+        "meal_planner": """You are a clinical meal planning AI.
+Your task is to generate a strictly structured 7-day meal plan based on health profiles.
+
+IMPORTANT RULES:
+1. YOUR RESPONSE MUST BE A SINGLE VALID JSON OBJECT.
+2. DO NOT INCLUDE ANY MARKDOWN, EXPLANATIONS, OR PREAMBLE.
+3. STICK TO THE SCHEMA PROVIDED IN THE PROMPT.
+4. ENSURE ALL HEALTH CONDITIONS AND ALLERGENS ARE RESPECTED.
+5. PROVIDE EXACT INGREDIENTS LISTS FOR EACH MEAL.
 """
     }
     
@@ -231,7 +241,7 @@ Rules:
                     ],
                     "stream": False
                 },
-                timeout=90  # 90s timeout for local inference
+                timeout=180  # 180s timeout for complex local inference
             )
             
             if response.status_code != 200:

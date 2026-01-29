@@ -146,6 +146,163 @@
             position: relative;
         }
 
+        /* Nav Tabs */
+        .nav-tabs {
+            display: none;
+            /* Hidden by default, shown when mode active */
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            padding: 12px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Meal Plan Grid */
+        .meal-plan-container {
+            display: none;
+            /* Shown via JS */
+        }
+
+        .meal-plan-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .day-column {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .day-header {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--primary);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+            margin-bottom: 4px;
+        }
+
+        .meal-slot {
+            padding: 10px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+        }
+
+        .meal-slot-title {
+            font-weight: 700;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .meal-slot-name {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .meal-slot-cals {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Grocery Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 500px;
+            border-radius: var(--radius-md);
+            padding: 32px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .grocery-cat {
+            margin-bottom: 20px;
+        }
+
+        .grocery-cat-title {
+            font-weight: 700;
+            font-size: 15px;
+            margin-bottom: 10px;
+            color: var(--secondary);
+        }
+
+        .grocery-list-items {
+            display: grid;
+            gap: 8px;
+        }
+
+        .grocery-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        /* Prediction Card Enhancements */
+        .prediction-box {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .pred-metric {
+            flex: 1;
+            padding: 12px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            text-align: center;
+        }
+
+        .pred-val {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .pred-lbl {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
         /* Sticky Header */
         .top-bar {
             position: sticky;
@@ -906,7 +1063,9 @@
             </div>
 
             <div class="nav-sections">
-                <a class="nav-item active"><i class="icon">🏠</i> Dashboard</a>
+                <a class="nav-item active" id="navDashboard" onclick="switchTab('dashboard')"><i class="icon">🏠</i>
+                    Dashboard</a>
+                <a class="nav-item" id="navPlan" onclick="switchTab('meal-plan')"><i class="icon">📅</i> Weekly Plan</a>
                 <a class="nav-item" onclick="location.href='food-scan.html'"><i class="icon">📸</i> Food Scan</a>
                 <a class="nav-item" onclick="location.href='upload.html'"><i class="icon">📄</i> Reports</a>
                 <a class="nav-item" onclick="location.href='app.html?mode=recipe'"><i class="icon">🍳</i> Recipes</a>
@@ -1078,20 +1237,33 @@
                     </div>
 
                     <div class="card ml-forecast-card" style="margin-bottom: 32px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <p class="label" style="font-size: 11px; margin-bottom: 4px;">30-Day Weight Forecast</p>
-                                <div style="display: flex; align-items: baseline; gap: 12px;">
-                                    <h3 style="font-size: 32px; font-weight: 800;" id="forecastWeight">-- kg</h3>
-                                    <span style="font-weight: 700; color: var(--primary);" id="forecastChange">+0.0
-                                        kg</span>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;">
+                            <div style="flex: 1;">
+                                <p class="label" style="font-size: 11px; margin-bottom: 4px;">Predictive Insights</p>
+                                <div class="prediction-box">
+                                    <div class="pred-metric">
+                                        <div class="pred-lbl">Next Meal</div>
+                                        <div class="pred-val" id="predNextMeal">--</div>
+                                        <div style="font-size: 11px; color: var(--text-muted);" id="predNextTime">--
+                                        </div>
+                                    </div>
+                                    <div class="pred-metric">
+                                        <div class="pred-lbl">Calorie Buffer</div>
+                                        <div class="pred-val" id="predBuffer">-- kcal</div>
+                                        <div style="font-size: 11px; color: var(--text-muted);" id="predBufferStatus">--
+                                        </div>
+                                    </div>
+                                    <div class="pred-metric">
+                                        <div class="pred-lbl">Weight 30d</div>
+                                        <div class="pred-val" id="predWeight">-- kg</div>
+                                        <div style="font-size: 11px; color: var(--text-muted);" id="predWeightTrend">--
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div class="status-badge safe" id="forecastStatus">Analyzing...</div>
                             </div>
                         </div>
                     </div>
+
 
                     <!-- Actions Group -->
                     <div class="section-header">
@@ -1142,6 +1314,30 @@
                             <input type="text" id="aiAgentInput" placeholder="Ask anything about your health..."
                                 onkeypress="if(event.key==='Enter') sendAgentMessage()">
                             <button class="chat-send-btn" id="sendAgentBtn" onclick="sendAgentMessage()">🚀</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Meal Plan Section (Hidden by default) -->
+                <div id="mealPlanSection" class="meal-plan-container">
+                    <div class="section-header">
+                        <div>
+                            <h2 class="section-title">Weekly Meal Plan</h2>
+                            <p class="section-desc" id="planDates">Your personalized 7-day nutritional map</p>
+                        </div>
+                        <div style="display: flex; gap: 12px;">
+                            <button class="btn-link" onclick="showGroceryList()"
+                                style="background: var(--secondary-soft); padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer;">📝
+                                View Groceries</button>
+                            <button class="btn-link" onclick="generateNewPlan()"
+                                style="background: var(--primary-soft); padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer;">✨
+                                Regenerate Plan</button>
+                        </div>
+                    </div>
+                    <div class="meal-plan-grid" id="mealPlanGrid">
+                        <!-- Injected via JS -->
+                        <div style="padding: 40px; text-align: center; width: 100%; grid-column: 1/-1;">
+                            <p>Loading your meal plan...</p>
                         </div>
                     </div>
                 </div>
@@ -1219,6 +1415,22 @@
                     </div>
                 </aside>
             </main>
+        </div>
+
+        <!-- Grocery List Modal -->
+        <div id="groceryModal" class="modal">
+            <div class="modal-content">
+                <div class="section-header" style="margin-bottom: 24px;">
+                    <h2 class="section-title">Grocery List</h2>
+                    <button onclick="closeModal('groceryModal')"
+                        style="border: none; background: transparent; font-size: 20px; cursor: pointer;">✕</button>
+                </div>
+                <div id="groceryListContent">
+                    <p>Loading list...</p>
+                </div>
+                <button onclick="closeModal('groceryModal')"
+                    style="width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; margin-top: 24px; cursor: pointer; font-weight: 700;">Done</button>
+            </div>
         </div>
     </div>
 
@@ -1625,9 +1837,190 @@
         // Better to just start it safely.
         anim();
 
+        // Multi-Tab Logic
+        function switchTab(tab) {
+            const dashboard = document.querySelector('.main-scroll-content');
+            const mealPlan = document.getElementById('mealPlanSection');
+            const navDashboard = document.getElementById('navDashboard');
+            const navPlan = document.getElementById('navPlan');
+
+            if (tab === 'meal-plan') {
+                dashboard.style.display = 'none';
+                mealPlan.style.display = 'block';
+                navDashboard.classList.remove('active');
+                navPlan.classList.add('active');
+                loadMealPlan();
+            } else {
+                dashboard.style.display = 'block';
+                mealPlan.style.display = 'none';
+                navDashboard.classList.add('active');
+                navPlan.classList.remove('active');
+            }
+        }
+
+        // Predictive Analytics Data
+        async function loadPredictions() {
+            try {
+                const [meal, budget, trajectory] = await Promise.all([
+                    fetch('/api/analytics/meal-prediction', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+                    fetch('/api/analytics/calorie-budget', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+                    fetch('/api/analytics/weight-trajectory', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+                ]);
+
+                // Update UI
+                document.getElementById('predNextMeal').textContent = meal.next_meal || '--';
+                document.getElementById('predNextTime').textContent = meal.estimated_time || '--';
+
+                document.getElementById('predBuffer').textContent = `${budget.remaining_calories} kcal`;
+                document.getElementById('predBufferStatus').textContent = budget.message;
+
+                if (trajectory.current_weight) {
+                    document.getElementById('predWeight').textContent = `${trajectory.predicted_30d} kg`;
+                    document.getElementById('predWeightTrend').textContent = trajectory.trend;
+                }
+            } catch (err) {
+                console.error('Prediction load error:', err);
+            }
+        }
+
+        // Meal Planning Logic
+        async function loadMealPlan() {
+            const grid = document.getElementById('mealPlanGrid');
+            try {
+                const response = await fetch('/api/meal-plan/current', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (data.has_plan) {
+                    renderMealPlan(data.plan);
+                    document.getElementById('planDates').textContent = `Active since ${data.start_date}`;
+                } else {
+                    grid.innerHTML = `
+                        <div style="grid-column: 1/-1; text-align: center; padding: 60px;">
+                            <p style="color: var(--text-muted); margin-bottom: 20px;">No plan generated yet.</p>
+                            <button onclick="generateNewPlan()" style="padding: 12px 24px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700;">✨ Generate Weekly Plan</button>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                grid.innerHTML = '<p>Error loading plan.</p>';
+            }
+        }
+
+        async function generateNewPlan() {
+            const grid = document.getElementById('mealPlanGrid');
+            grid.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 60px;">
+                    <div style="font-size: 40px; margin-bottom: 20px;">🤖</div>
+                    <h3 style="margin-bottom: 12px;">Generating your personalized AI plan...</h3>
+                    <p style="color: var(--text-muted); font-size: 14px;">Our AI is analyzing your medical profile and crafting your 7-day schedule.<br><strong>This can take up to 2 minutes.</strong> Please stay on this page.</p>
+                </div>
+            `;
+            try {
+                const response = await fetch('/api/meal-plan/generate', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    renderMealPlan(data.plan);
+                } else {
+                    alert('Generation failed: ' + (data.detail || 'Internal error'));
+                    loadMealPlan();
+                }
+            } catch (err) {
+                alert('Connection error');
+                loadMealPlan();
+            }
+        }
+
+        function renderMealPlan(planData) {
+            const grid = document.getElementById('mealPlanGrid');
+            const weekly = planData.weekly_plan || {};
+
+            let html = '';
+            // Sorting keys Day 1, Day 2 etc
+            const days = Object.keys(weekly).sort((a, b) => {
+                const numA = parseInt(a.replace('Day ', ''));
+                const numB = parseInt(b.replace('Day ', ''));
+                return numA - numB;
+            });
+
+            days.forEach(day => {
+                const dayData = weekly[day];
+                html += `
+                    <div class="day-column">
+                        <div class="day-header">${day}</div>
+                        ${renderMealSlot('Breakfast', dayData.Breakfast)}
+                        ${renderMealSlot('Lunch', dayData.Lunch)}
+                        ${renderMealSlot('Dinner', dayData.Dinner)}
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+        }
+
+        function renderMealSlot(type, meal) {
+            if (!meal) return '';
+            return `
+                <div class="meal-slot">
+                    <div class="meal-slot-title">${type}</div>
+                    <div class="meal-slot-name">${meal.name}</div>
+                    <div class="meal-slot-cals">${meal.calories} kcal</div>
+                </div>
+            `;
+        }
+
+        // Grocery List Modal
+        async function showGroceryList() {
+            document.getElementById('groceryModal').style.display = 'flex';
+            const content = document.getElementById('groceryListContent');
+            content.innerHTML = '<p>Preparing your list...</p>';
+
+            try {
+                const response = await fetch('/api/grocery-list', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    if (!data.grocery_list || data.grocery_list.length === 0) {
+                        content.innerHTML = '<p style="text-align: center; padding: 20px;">Your grocery list is empty. Try generating a meal plan first!</p>';
+                        return;
+                    }
+                    let html = '';
+                    data.grocery_list.forEach(cat => {
+                        html += `
+                            <div class="grocery-cat">
+                                <div class="grocery-cat-title">${cat.category}</div>
+                                <div class="grocery-list-items">
+                                    ${cat.items.map(i => `
+                                        <label class="grocery-item">
+                                            <input type="checkbox"> ${i}
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    content.innerHTML = html;
+                } else {
+                    content.innerHTML = `<p style="padding: 20px; text-align: center; color: var(--danger);">Error: ${data.detail || data.message || 'Could not load grocery list'}</p>`;
+                }
+            } catch (err) {
+                content.innerHTML = '<p>Error fetching list.</p>';
+            }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             initWaterReminders();
             loadProfile();
+            loadPredictions();
         });
     </script>
 </body>
