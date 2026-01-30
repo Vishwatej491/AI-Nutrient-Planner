@@ -339,6 +339,9 @@ async def chat(request: ChatRequest, user: dict = Depends(get_current_user)):
     try:
         user_id = user["sub"]
         
+        # Retrieve recent meal logs for context
+        user_meal_logs = meal_log_store.get_recent_logs(user_id, limit=5)
+        
         # =====================================================
         # RAG STEP 1: RETRIEVAL - Auto-fetch food context
         # =====================================================

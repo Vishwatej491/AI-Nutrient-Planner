@@ -1086,10 +1086,11 @@
 
                 <div class="header-actions">
                     <button class="action-btn" title="View Notifications">🔔</button>
-                    <div class="user-profile" onclick="handleLogout()">
-                        <div class="avatar" id="userAvatar">U</div>
+                    <div class="user-profile" onclick="handleLogout()"
+                        style="border-color: var(--danger); color: var(--danger);">
+                        <div class="avatar" style="background: var(--danger); color: white;">⏻</div>
                         <div class="user-info">
-                            <div class="name" id="userName">User</div>
+                            <div class="name" style="color: var(--danger);">Logout</div>
                         </div>
                     </div>
                 </div>

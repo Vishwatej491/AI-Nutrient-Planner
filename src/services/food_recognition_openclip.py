@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 import torch
 from PIL import Image
+from services.vector_db import get_vector_db_service
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -209,7 +210,10 @@ class OpenCLIPClassifier:
         self.cuisine_names: List[str] = []
         self.food_group_embeddings: Optional[torch.Tensor] = None
         self.food_group_names: List[str] = []
-        self.dish_embeddings: Optional[torch.Tensor] = None
+        
+        # VectorDB integration
+        self.vdb = get_vector_db_service()
+        self.dish_collection = "indian_dishes"
         
         # File modification times for hot-reload detection
         self._file_mtimes: Dict[str, float] = {}
@@ -356,26 +360,37 @@ class OpenCLIPClassifier:
                 self.food_group_embeddings = torch.stack(group_embeds)
                 logger.info(f"Precomputed {len(self.food_group_names)} food group embeddings")
             
-            # 3. Dish embeddings - ALWAYS computed from expanded_indian_food_3000_plus.txt
-            # These provide the actual food dish names for output
+            # 3. Dish embeddings - Pushed to VectorDB
             if self.dish_labels:
-                logger.info(f"Precomputing {len(self.dish_labels)} dish embeddings (this may take a moment)...")
-                # Process in batches to avoid memory issues
-                batch_size = 100
-                dish_embeds = []
-                
-                for i in range(0, len(self.dish_labels), batch_size):
-                    batch = self.dish_labels[i:i + batch_size]
-                    # Create simple prompts for each dish name
-                    prompts = [f"a photo of {dish}" for dish in batch]
-                    tokens = self.tokenizer(prompts).to(self.device)
-                    embeds = self.model.encode_text(tokens)
-                    embeds = embeds / embeds.norm(dim=-1, keepdim=True)
-                    dish_embeds.append(embeds)
-                
-                if dish_embeds:
-                    self.dish_embeddings = torch.cat(dish_embeds, dim=0)
-                    logger.info(f"Precomputed {len(self.dish_labels)} dish embeddings")
+                collection = self.vdb.get_or_create_collection(self.dish_collection)
+                if collection and collection.count() >= len(self.dish_labels):
+                    logger.info(f"✓ VectorDB collection '{self.dish_collection}' already populated.")
+                else:
+                    logger.info(f"Precomputing {len(self.dish_labels)} dish embeddings for VectorDB...")
+                    batch_size = 100
+                    all_dish_embeds = []
+                    all_ids = []
+                    
+                    for i in range(0, len(self.dish_labels), batch_size):
+                        batch = self.dish_labels[i:i + batch_size]
+                        prompts = [f"a photo of {dish}" for dish in batch]
+                        tokens = self.tokenizer(prompts).to(self.device)
+                        embeds = self.model.encode_text(tokens)
+                        embeds = embeds / embeds.norm(dim=-1, keepdim=True)
+                        
+                        all_dish_embeds.append(embeds.cpu())
+                        all_ids.extend([f"dish_{j}" for j in range(i, i + len(batch))])
+                    
+                    if all_dish_embeds:
+                        embeddings_list = torch.cat(all_dish_embeds, dim=0).tolist()
+                        metadatas = [{"name": name} for name in self.dish_labels]
+                        self.vdb.upsert_vectors(
+                            collection_name=self.dish_collection,
+                            ids=all_ids,
+                            embeddings=embeddings_list,
+                            metadatas=metadatas
+                        )
+                        logger.info(f"✓ Pushed {len(self.dish_labels)} dish embeddings to VectorDB")
             else:
                 logger.warning("No dish labels loaded - dish names will not be available")
         
@@ -512,39 +527,35 @@ class OpenCLIPClassifier:
         top_k: int = 5
     ) -> List[ClassificationResult]:
         """
-        Stage 3 (Optional): Classify specific dish.
-        
-        Note: This is the lowest priority - use only for testing.
-        Accuracy at dish level is NOT required.
-        
-        Args:
-            image: PIL Image to classify
-            top_k: Number of top predictions to return
-            
-        Returns:
-            List of ClassificationResult sorted by confidence
+        Stage 3: Classify specific dish using VectorDB.
         """
-        if self.dish_embeddings is None or len(self.dish_labels) == 0:
-            logger.warning("Dish classification not enabled or no embeddings available")
+        if not self.dish_labels:
+            logger.warning("Dish labels not loaded")
             return []
         
         # Encode image
         image_embedding = self._encode_image(image)
         
-        with torch.no_grad():
-            similarities = (image_embedding @ self.dish_embeddings.T).squeeze(0)
-            probs = torch.softmax(similarities * 100, dim=0)
-            top_probs, top_indices = probs.topk(min(top_k, len(self.dish_labels)))
+        # Search VectorDB
+        query_embeddings = image_embedding.cpu().tolist()
+        results = self.vdb.query(
+            collection_name=self.dish_collection,
+            query_embeddings=query_embeddings,
+            n_results=top_k
+        )
         
-        results = []
-        for prob, idx in zip(top_probs.cpu().numpy(), top_indices.cpu().numpy()):
-            results.append(ClassificationResult(
-                label=self.dish_labels[idx],
-                confidence=float(prob),
+        if not results or not results['ids'][0]:
+            return []
+            
+        results_list = []
+        for i in range(len(results['ids'][0])):
+            results_list.append(ClassificationResult(
+                label=results['metadatas'][0][i]['name'],
+                confidence=float(1.0 - results['distances'][0][i]), # Approximate
                 category="dish"
             ))
         
-        return results
+        return results_list
     
     def classify_hierarchical(
         self, 

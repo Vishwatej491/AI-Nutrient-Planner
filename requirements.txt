@@ -36,9 +36,6 @@ protobuf>=4.21.0
 # OpenCLIP for food classification
 open_clip_torch>=2.20.0
 
-# Future dependencies (Phase 3+)
-# fastapi>=0.100.0
-# uvicorn>=0.23.0
-# faiss-cpu>=1.7.4
-# openai-whisper>=20230918
+# Vector Database for semantic search
+chromadb>=0.4.0
 

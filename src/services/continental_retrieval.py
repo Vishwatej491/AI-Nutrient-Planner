@@ -5,6 +5,7 @@ from PIL import Image
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from transformers import CLIPProcessor, CLIPModel
+from services.vector_db import get_vector_db_service
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +34,8 @@ class ContinentalRetrievalSystem:
         self.processor = None
         self.dish_names: List[str] = []
         self.text_features: Optional[torch.Tensor] = None
+        self.vdb = get_vector_db_service()
+        self.collection_name = "continental_dishes"
         
         logger.info(f"Initializing ContinentalRetrievalSystem on {self.device} ({self.dtype})")
         
@@ -63,77 +66,54 @@ class ContinentalRetrievalSystem:
 
     @torch.inference_mode()
     def build_text_index(self):
-        """C. Generates and caches text embeddings using prompt ensemble."""
-        cache_path = self.DISHES_PATH.parent / "continental_embeddings.pt"
-        
-        # Try loading from cache first
-        if cache_path.exists():
-            try:
-                logger.info(f"Loading cached text index from {cache_path}...")
-                cached_data = torch.load(cache_path, map_location=self.device)
-                
-                # Validation: Ensure cache matches current dishes
-                if cached_data.get("dish_names") == self.dish_names:
-                    self.text_features = cached_data["features"].to(self.device).to(self.dtype)
-                    logger.info(f"✓ Cache loaded. Shape: {self.text_features.shape}")
-                    return
-                else:
-                    logger.warning("Cache mismatch (dish list changed). Rebuilding index...")
-            except Exception as e:
-                logger.warning(f"Failed to load cache: {e}. Rebuilding...")
-        
-        logger.info("Building text embedding index (Offline Stage)...")
+        """C. Generates and pushes text embeddings to ChromaDB."""
+        # Check if already in VectorDB
+        collection = self.vdb.get_or_create_collection(self.collection_name)
+        if collection and collection.count() >= len(self.dish_names):
+            logger.info(f"✓ VectorDB collection '{self.collection_name}' already populated.")
+            return
+
+        logger.info("Building text embedding index for VectorDB (Offline Stage)...")
         
         # Use only the two requested prompt templates
         templates = ["a photo of {}", "a photo of {} food"]
         
         all_features = []
+        all_ids = []
         
         # Batch process for efficiency
         batch_size = 32
-        total_batches = (len(self.dish_names) + batch_size - 1) // batch_size
-        
         for i in range(0, len(self.dish_names), batch_size):
-            batch_num = (i // batch_size) + 1
-            if batch_num % 5 == 0:
-                logger.info(f"Processing batch {batch_num}/{total_batches}...")
-                
             batch_dishes = self.dish_names[i : i + batch_size]
             
             # For each template, compute features
             template_features = []
             for template in templates:
                 prompts = [template.format(dish) for dish in batch_dishes]
-                
                 inputs = self.processor(text=prompts, return_tensors="pt", padding=True).to(self.device)
                 features = self.model.get_text_features(**inputs)
-                
-                # Normalize features
                 features = features / features.norm(p=2, dim=-1, keepdim=True)
                 template_features.append(features)
             
-            # Average the embeddings across the two templates (Prompt Ensembling)
-            # Stack: [2, batch_size, dim] -> Mean: [batch_size, dim]
+            # Average and normalize
             averaged_batch = torch.stack(template_features).mean(dim=0)
-            
-            # Re-normalize after averaging
             averaged_batch = averaged_batch / averaged_batch.norm(p=2, dim=-1, keepdim=True)
-            all_features.append(averaged_batch)
             
-        # Final cached index: [num_dishes, dim]
-        self.text_features = torch.cat(all_features, dim=0)
+            # Add to list for upserting
+            all_features.append(averaged_batch.cpu())
+            all_ids.extend([f"cont_{j}" for j in range(i, i + len(batch_dishes))])
+            
+        # Push to VectorDB
+        embeddings_list = torch.cat(all_features, dim=0).tolist()
+        metadatas = [{"name": name} for name in self.dish_names]
         
-        # Save to cache
-        try:
-            torch.save({
-                "dish_names": self.dish_names,
-                "features": self.text_features
-            }, cache_path)
-            logger.info(f"✓ Index built and cached to {cache_path}")
-        except Exception as e:
-            logger.error(f"Failed to save cache: {e}")
-            
-        logger.info(f"Text index ready. Shape: {self.text_features.shape}")
+        self.vdb.upsert_vectors(
+            collection_name=self.collection_name,
+            ids=all_ids,
+            embeddings=embeddings_list,
+            metadatas=metadatas
+        )
+        logger.info(f"✓ Index built and pushed to VectorDB '{self.collection_name}'")
 
     @torch.inference_mode()
     def encode_image(self, pil_image: Image.Image) -> torch.Tensor:
@@ -155,19 +135,32 @@ class ContinentalRetrievalSystem:
         return image_features
 
     def retrieve_top_k(self, image_features: torch.Tensor, k: int = 5) -> Dict[str, Any]:
-        """E. Computes cosine similarity and ranks Top-K."""
-        # Matrix multiplication = Cosine Similarity (since vectors are normalized)
-        # [1, dim] @ [dim, num_dishes] -> [1, num_dishes]
-        similarities = (image_features @ self.text_features.T).squeeze(0)
+        """E. Queries VectorDB for Nearest Neighbors."""
+        # Search VectorDB
+        query_embeddings = image_features.cpu().tolist()
+        results = self.vdb.query(
+            collection_name=self.collection_name,
+            query_embeddings=query_embeddings,
+            n_results=k
+        )
         
-        # Get Top-K
-        top_scores, top_indices = torch.topk(similarities, k=k)
-        
+        if not results or not results['ids'][0]:
+            return {
+                "top_k_predictions": [],
+                "confidence": 0.0,
+                "status": "unknown",
+                "message": "No results from VectorDB"
+            }
+            
         predictions = []
-        for score, idx in zip(top_scores, top_indices):
+        # distance in chroma is usually L2 or Cosine. We assume cosine for CLIP.
+        # similarities = 1 - distance (if using cosine distance)
+        # Note: CLIP features were normalized, so dot product = cosine similarity.
+        
+        for i in range(len(results['ids'][0])):
             predictions.append({
-                "dish": self.dish_names[idx.item()],
-                "score": round(score.item(), 4)
+                "dish": results['metadatas'][0][i]['name'],
+                "score": round(1.0 - results['distances'][0][i], 4) # Approximate cosine similarity
             })
             
         max_score = predictions[0]["score"]

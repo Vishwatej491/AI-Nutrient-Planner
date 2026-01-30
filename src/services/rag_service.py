@@ -12,6 +12,9 @@ import os
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from services.nutrition_registry import get_nutrition_registry
+from services.vector_db import get_vector_db_service
+import torch
+from transformers import CLIPProcessor, CLIPModel
 
 
 class RAGService:
@@ -25,11 +28,56 @@ class RAGService:
     """
     
     def __init__(self):
-        """Initialize RAG service with food database."""
+        """Initialize RAG service with food database and VectorDB."""
         self.registry = get_nutrition_registry()
         # Maintain food_db for compatibility, but map to Registry names
         self.food_db = {item['name'].lower(): item for item in self.registry.get_all()}
+        self.vdb = get_vector_db_service()
+        self.collection_name = "nutrition_items"
+        
+        # CLIP for text embeddings
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model_id = "openai/clip-vit-base-patch32"
+        self.model = None
+        self.processor = None
+        
         print(f"[RAG] Service initialized using NutritionRegistry ({len(self.food_db)} items)")
+        self._ensure_vector_index()
+
+    def _load_clip(self):
+        """Lazy load CLIP for text encoding."""
+        if self.model is None:
+            print(f"[RAG] Loading {self.model_id} for semantic search...")
+            self.model = CLIPModel.from_pretrained(self.model_id).to(self.device).eval()
+            self.processor = CLIPProcessor.from_pretrained(self.model_id)
+
+    def _ensure_vector_index(self):
+        """Ensure nutrition items are indexed in VectorDB."""
+        collection = self.vdb.get_or_create_collection(self.collection_name)
+        if collection and collection.count() >= len(self.food_db):
+            print(f"[RAG] VectorDB index '{self.collection_name}' is ready.")
+            return
+
+        print(f"[RAG] Building semantic index for {len(self.food_db)} items...")
+        self._load_clip()
+        
+        all_names = list(self.food_db.keys())
+        batch_size = 100
+        
+        for i in range(0, len(all_names), batch_size):
+            batch = all_names[i:i + batch_size]
+            with torch.no_grad():
+                inputs = self.processor(text=[f"a photo of {n}" for n in batch], return_tensors="pt", padding=True).to(self.device)
+                features = self.model.get_text_features(**inputs)
+                features = features / features.norm(p=2, dim=-1, keepdim=True)
+                
+            embeddings = features.cpu().tolist()
+            ids = [f"nut_{j}" for j in range(i, i + len(batch))]
+            metadatas = [{"name": n} for n in batch]
+            
+            self.vdb.upsert_vectors(self.collection_name, ids, embeddings, metadatas)
+        
+        print(f"[RAG] Semantic index built successfully.")
 
     
     def get_medical_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -114,23 +162,24 @@ class RAGService:
     
     def search_foods(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
         """
-        Search food database by name.
-        
-        Args:
-            query: Food name to search for
-            limit: Maximum results to return
-            
-        Returns:
-            List of matching foods with nutrition info
+        Search food database using semantic similarity via VectorDB.
         """
-        query_lower = query.lower()
-        matches = []
+        self._load_clip()
         
-        for name, food in self.food_db.items():
-            if query_lower in name:
-                matches.append(food)
-                if len(matches) >= limit:
-                    break
+        with torch.no_grad():
+            inputs = self.processor(text=[f"a photo of {query}"], return_tensors="pt", padding=True).to(self.device)
+            features = self.model.get_text_features(**inputs)
+            features = features / features.norm(p=2, dim=-1, keepdim=True)
+            
+        params = features.cpu().tolist()
+        results = self.vdb.query(self.collection_name, params, n_results=limit)
+        
+        matches = []
+        if results and results['ids'][0]:
+            for meta in results['metadatas'][0]:
+                name = meta['name']
+                if name in self.food_db:
+                    matches.append(self.food_db[name])
         
         return matches
     
