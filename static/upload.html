@@ -5,140 +5,98 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload Medical Report - AI Nutrition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="theme.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            min-height: 100vh;
-            color: #fff;
-        }
-
-        .header {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 16px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .header h1 {
-            color: #00d4aa;
-            font-size: 24px;
-        }
-
-        .back-btn {
-            padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            color: #fff;
-            text-decoration: none;
-            font-size: 14px;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
+        /* Specific Styles for Upload Page (extending theme) */
         .upload-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
+            background: var(--card);
+            border-radius: 20px;
             padding: 40px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
             text-align: center;
         }
 
-        .upload-card h2 {
-            margin-bottom: 10px;
-        }
-
-        .upload-card .subtitle {
-            color: #888;
-            margin-bottom: 30px;
-        }
-
         .drop-zone {
-            border: 2px dashed rgba(0, 212, 170, 0.5);
+            border: 2px dashed var(--border);
             border-radius: 16px;
             padding: 60px 40px;
             cursor: pointer;
             transition: all 0.3s;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+            background: var(--bg);
         }
 
         .drop-zone:hover,
         .drop-zone.dragover {
-            border-color: #00d4aa;
-            background: rgba(0, 212, 170, 0.1);
+            border-color: var(--primary);
+            background: var(--primary-soft);
         }
 
         .drop-zone-icon {
-            font-size: 60px;
+            font-size: 48px;
             margin-bottom: 16px;
+            color: var(--primary);
         }
 
         .drop-zone-text {
-            color: #888;
+            color: var(--text-muted);
+            font-size: 16px;
         }
 
         .drop-zone-text strong {
-            color: #00d4aa;
-        }
-
-        #fileInput {
-            display: none;
-        }
-
-        .file-preview {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .file-preview.show {
-            display: block;
-        }
-
-        .file-name {
-            color: #00d4aa;
+            color: var(--primary);
             font-weight: 600;
         }
 
-        .file-size {
-            color: #888;
-            font-size: 14px;
+        .file-preview {
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: none;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+
+        .file-preview.show {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-icon {
+            font-size: 24px;
         }
 
         .upload-btn {
             width: 100%;
             padding: 16px;
-            background: linear-gradient(135deg, #00d4aa 0%, #00a885 100%);
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             border: none;
-            border-radius: 10px;
-            color: #fff;
+            border-radius: 12px;
+            color: white;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
+            box-shadow: var(--shadow-md);
         }
 
-        .upload-btn:hover {
+        .upload-btn:hover:not(:disabled) {
             transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
         }
 
         .upload-btn:disabled {
-            opacity: 0.5;
+            opacity: 0.6;
             cursor: not-allowed;
             transform: none;
         }
@@ -146,142 +104,241 @@
         .status {
             margin-top: 24px;
             padding: 16px;
-            border-radius: 8px;
+            border-radius: 12px;
             display: none;
+            text-align: left;
         }
 
         .status.uploading {
             display: block;
-            background: rgba(0, 212, 170, 0.1);
-            border: 1px solid rgba(0, 212, 170, 0.3);
-            color: #00d4aa;
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            border: 1px solid var(--primary);
         }
 
         .status.processing {
             display: block;
-            background: rgba(255, 193, 7, 0.1);
-            border: 1px solid rgba(255, 193, 7, 0.3);
-            color: #ffc107;
+            background: #fffbeb;
+            color: #b45309;
+            border: 1px solid #fcd34d;
         }
 
         .status.success {
             display: block;
-            background: rgba(0, 212, 170, 0.1);
-            border: 1px solid rgba(0, 212, 170, 0.3);
-            color: #00d4aa;
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            border: 1px solid var(--primary);
         }
 
         .status.error {
             display: block;
-            background: rgba(255, 71, 87, 0.1);
-            border: 1px solid rgba(255, 71, 87, 0.3);
-            color: #ff4757;
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
         }
 
         .progress-bar {
-            height: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 100px;
             margin-top: 12px;
             overflow: hidden;
         }
 
         .progress-fill {
             height: 100%;
-            background: #00d4aa;
+            background: var(--primary);
             width: 0%;
-            transition: width 0.3s;
+            transition: width 0.3s ease-out;
+            border-radius: 100px;
         }
 
         .result-box {
-            margin-top: 24px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            padding: 20px;
+            margin-top: 30px;
+            background: var(--bg);
+            border-radius: 16px;
+            padding: 24px;
             text-align: left;
             display: none;
+            border: 1px solid var(--border);
         }
 
         .result-box.show {
             display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .result-box h4 {
-            color: #00d4aa;
-            margin-bottom: 12px;
+            color: var(--primary-dark);
+            margin-bottom: 16px;
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .result-item {
-            margin: 8px 0;
-            color: #ccc;
+            margin: 12px 0;
+            color: var(--text-main);
+            font-size: 15px;
+            line-height: 1.5;
         }
 
         .result-item strong {
-            color: #fff;
+            color: var(--text-main);
+            font-weight: 600;
         }
 
         .allowed-formats {
-            margin-top: 20px;
-            padding: 12px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            font-size: 12px;
-            color: #888;
+            margin-top: 24px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Debug toggle styling */
+        details summary {
+            outline: none;
+            transition: color 0.2s;
+        }
+
+        details summary:hover {
+            color: var(--primary-dark) !important;
         }
     </style>
 </head>
 
 <body>
-    <div class="header">
-        <h1>🥗 AI Nutrition</h1>
-        <a href="dashboard.html" class="back-btn">← Back to Dashboard</a>
-    </div>
-
-    <div class="container">
-        <div class="upload-card">
-            <h2>📄 Upload Medical Report</h2>
-            <p class="subtitle">We'll extract your health conditions and allergens</p>
-
-            <div class="drop-zone" id="dropZone">
-                <div class="drop-zone-icon">📁</div>
-                <p class="drop-zone-text">
-                    Drag & drop your file here<br>
-                    or <strong>click to browse</strong>
-                </p>
+    <div class="app-shell">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="logo" onclick="location.href='index.html'">
+                <div class="logo-icon">🥗</div>
+                <h1>Nutrition<span>AI</span></h1>
             </div>
 
-            <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png">
-
-            <div class="file-preview" id="filePreview">
-                <span class="file-name" id="fileName"></span>
-                <span class="file-size" id="fileSize"></span>
+            <div class="nav-sections">
+                <a class="nav-item" href="dashboard.html"><i class="icon">🏠</i> Dashboard</a>
+                <a class="nav-item" href="dashboard.html"><i class="icon">📅</i> Weekly Plan</a>
+                <a class="nav-item" href="food-scan.html"><i class="icon">📸</i> Food Scan</a>
+                <a class="nav-item active" href="upload.html"><i class="icon">📄</i> Reports</a>
+                <a class="nav-item" href="app.html?mode=recipe"><i class="icon">🍳</i> Recipes</a>
+                <a class="nav-item" href="app.html?mode=analyze"><i class="icon">💬</i> Nutrient Chat</a>
             </div>
 
-            <button class="upload-btn" id="uploadBtn" disabled>Upload & Process</button>
-
-            <div class="status" id="status">
-                <span id="statusText"></span>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
+            <div class="nav-footer">
+                <div class="nav-item" onclick="handleLogout()" style="color: var(--danger);">
+                    <i class="icon">🚪</i> Logout
                 </div>
             </div>
+        </nav>
 
-            <div class="result-box" id="resultBox">
-                <h4>✓ Profile Created</h4>
-                <div id="resultContent"></div>
-            </div>
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="breadcrumbs">
+                    <span class="text-muted">Pages /</span>
+                    <span class="current">Upload Report</span>
+                </div>
+                <div class="user-profile">
+                    <div class="avatar">U</div>
+                    <span class="username" id="userNameDisplay">User</span>
+                </div>
+            </header>
 
-            <div class="allowed-formats">
-                Allowed formats: PDF, JPG, PNG (max 10MB)
-            </div>
+            <main class="content-body single-col">
+                <div class="upload-card">
+                    <div class="icon-header" style="font-size: 40px; margin-bottom: 16px;">📄</div>
+                    <h2 style="font-size: 24px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">Upload
+                        Medical Report</h2>
+                    <p style="color: var(--text-muted); margin-bottom: 32px;">
+                        Upload your recent blood work or medical report. <br>
+                        We'll analyze it to personalize your nutrition plan and safety rules.
+                    </p>
+
+                    <div class="drop-zone" id="dropZone">
+                        <div class="drop-zone-icon">☁️</div>
+                        <p class="drop-zone-text">
+                            Drag & drop your file here<br>
+                            or <strong>click to browse</strong>
+                        </p>
+                    </div>
+
+                    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="display: none;">
+
+                    <div class="file-preview" id="filePreview">
+                        <div class="file-info">
+                            <span class="file-icon">📎</span>
+                            <div>
+                                <div class="file-name" id="fileName" style="font-weight: 600; color: var(--text-main);">
+                                </div>
+                                <div class="file-size" id="fileSize" style="font-size: 13px; color: var(--text-muted);">
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="removeFile()"
+                            style="background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-muted);">&times;</button>
+                    </div>
+
+                    <button class="upload-btn" id="uploadBtn" disabled>Analyze Report</button>
+
+                    <div class="status" id="status">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <span id="statusIcon"></span>
+                            <span id="statusText" style="font-weight: 600;"></span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                    </div>
+
+                    <div class="result-box" id="resultBox">
+                        <h4>✅ Analysis Complete</h4>
+                        <div id="resultContent"></div>
+                    </div>
+
+                    <div class="allowed-formats">
+                        Supported formats: PDF, JPG, PNG (Max 10MB)
+                    </div>
+                </div>
+            </main>
         </div>
     </div>
 
     <script>
+        // Use relative path for API
         const API_BASE = '';
         const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
 
         if (!token) {
+            window.location.href = 'login.html';
+        }
+
+        if (user) {
+            try {
+                const userData = JSON.parse(user);
+                document.getElementById('userNameDisplay').textContent = userData.name || 'User';
+                document.querySelector('.avatar').textContent = (userData.name || 'U').charAt(0).toUpperCase();
+            } catch (e) { }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
             window.location.href = 'login.html';
         }
 
@@ -324,10 +381,19 @@
             if (fileInput.files.length) handleFile(fileInput.files[0]);
         });
 
+        function removeFile() {
+            selectedFile = null;
+            fileInput.value = '';
+            filePreview.classList.remove('show');
+            uploadBtn.disabled = true;
+            status.style.display = 'none';
+            resultBox.classList.remove('show');
+        }
+
         function handleFile(file) {
-            const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
+            const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
             if (!allowed.includes(file.type)) {
-                alert('Please upload a PDF or image file');
+                alert('Please upload a PDF or image file (JPG, PNG)');
                 return;
             }
 
@@ -338,9 +404,11 @@
 
             selectedFile = file;
             fileName.textContent = file.name;
-            fileSize.textContent = ` (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+            fileSize.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
             filePreview.classList.add('show');
             uploadBtn.disabled = false;
+            status.style.display = 'none';
+            resultBox.classList.remove('show');
         }
 
         // Upload
@@ -352,14 +420,16 @@
 
             // Show uploading status
             status.className = 'status uploading';
-            statusText.textContent = '⬆️ Uploading file...';
+            document.getElementById('statusIcon').textContent = '⬆️';
+            statusText.textContent = 'Uploading file...';
             progressFill.style.width = '30%';
 
             try {
                 const formData = new FormData();
                 formData.append('file', selectedFile);
 
-                const response = await fetch(`${API_BASE}/api/medical-report/upload`, {
+                // Check API endpoint - ensure it matches backend
+                const response = await fetch(`${API_BASE}/upload/medical-report`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
@@ -367,56 +437,62 @@
 
                 // Show processing status
                 status.className = 'status processing';
-                statusText.textContent = '🔍 Scanning document...';
+                document.getElementById('statusIcon').textContent = '🔍';
+                statusText.textContent = 'Scanning document contents...';
                 progressFill.style.width = '60%';
 
                 // Check for auth error BEFORE parsing JSON
                 if (response.status === 401) {
-                    alert('Session expired. Please login again.');
-                    localStorage.removeItem('token');
-                    window.location.href = 'login.html';
-                    return;
+                    throw new Error('401 Unauthorized');
+                }
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || 'Upload failed');
                 }
 
                 const data = await response.json();
 
-                if (response.ok) {
-                    progressFill.style.width = '100%';
-                    status.className = 'status success';
-                    statusText.textContent = '✓ Medical profile created successfully!';
+                progressFill.style.width = '100%';
+                status.className = 'status success';
+                document.getElementById('statusIcon').textContent = '✓';
+                statusText.textContent = 'Medical profile updated!';
 
-                    // Show results
+                // Show results
+                setTimeout(() => {
+                    status.style.display = 'none';
                     resultBox.classList.add('show');
-                    resultContent.innerHTML = `
-                        <div class="result-item"><strong>Conditions:</strong> ${data.profile?.conditions?.join(', ') || 'None detected'}</div>
-                        <div class="result-item"><strong>Allergens:</strong> ${data.profile?.allergens?.join(', ') || 'None detected'}</div>
-                        
-                        <div style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
-                            <details>
-                                <summary style="color: #00d4aa; cursor: pointer; font-weight: 600;">🔍 View Extracted Text (Debug)</summary>
-                                <p style="font-size: 12px; color: #888; margin: 5px 0;">This is what the AI read from your file:</p>
-                                <pre style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; white-space: pre-wrap; font-family: monospace; font-size: 11px; color: #e0e0e0; max-height: 300px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1);">${data.debug_text || 'No text extracted'}</pre>
-                            </details>
-                        </div>
 
-                        <div class="result-item" style="margin-top: 20px;">
-                            <a href="dashboard.html" style="color: #fff; text-decoration: underline;">← Return to Dashboard</a>
+                    // Format lists
+                    const conditions = data.profile?.conditions?.length ?
+                        data.profile.conditions.map(c => `<span style="display:inline-block; padding: 4px 10px; background: #fee2e2; color: #b91c1c; border-radius: 20px; font-size: 12px; font-weight: 600; margin-right: 6px; margin-bottom: 4px;">${c}</span>`).join('')
+                        : '<span class="text-muted">None detected</span>';
+
+                    const allergens = data.profile?.allergens?.length ?
+                        data.profile.allergens.map(a => `<span style="display:inline-block; padding: 4px 10px; background: #fef3c7; color: #b45309; border-radius: 20px; font-size: 12px; font-weight: 600; margin-right: 6px; margin-bottom: 4px;">${a}</span>`).join('')
+                        : '<span class="text-muted">None detected</span>';
+
+                    resultContent.innerHTML = `
+                        <div class="result-item"><strong>Conditions Detected:</strong> <br><div style="margin-top:8px">${conditions}</div></div>
+                        <div class="result-item"><strong>Allergens Detected:</strong> <br><div style="margin-top:8px">${allergens}</div></div>
+                        
+                        <div style="margin-top: 24px; display: flex; gap: 12px;">
+                            <button onclick="location.href='dashboard.html'" class="upload-btn" style="flex: 1;">Go to Dashboard</button>
                         </div>
                     `;
-                } else {
-                    throw new Error(data.detail || 'Upload failed');
-                }
+                }, 800);
+
             } catch (err) {
+                console.error(err);
                 status.className = 'status error';
-                statusText.textContent = `❌ Error: ${err.message}`;
+                document.getElementById('statusIcon').textContent = '❌';
+                statusText.textContent = `Error: ${err.message.replace('Error: ', '')}`;
                 progressFill.style.width = '0%';
                 uploadBtn.disabled = false;
 
-                // If auth error, redirect to login
-                if (err.message.includes('401') || err.message.includes('auth') || err.message.includes('Unauthorized')) {
+                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
                     alert('Session expired. Please login again.');
-                    localStorage.removeItem('token');
-                    window.location.href = 'login.html';
+                    handleLogout();
                 }
             }
         });

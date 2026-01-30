@@ -4,439 +4,175 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Nutrition - Complete App</title>
+    <title>AI Nutrition - App</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="theme.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --bg: #ffffff;
-            --card: #ffffff;
-            --primary: #10b981;
-            --primary-dark: #059669;
-            --accent: #3b82f6;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --text: #1e293b;
-            --muted: #64748b;
-            --border: #e2e8f0;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #f8fafc;
-            color: var(--text);
-            min-height: 100vh;
-        }
-
-        .header {
-            background: var(--card);
-            padding: 16px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-            box-shadow: var(--shadow);
-        }
-
-        .header h1 {
-            color: var(--primary);
-            font-size: 24px;
-        }
-
-        .header-right {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .user-badge {
-            background: var(--bg);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-        }
-
-        .logout-btn {
-            background: none;
-            border: 1px solid var(--danger);
-            color: var(--danger);
-            padding: 6px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        /* Input Section */
-        .input-section {
-            background: var(--card);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-            box-shadow: var(--shadow);
-        }
-
-        .input-tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid var(--border);
-            padding-bottom: 12px;
-        }
-
-        .input-tab {
-            padding: 10px 20px;
-            border: none;
-            background: none;
-            font-size: 15px;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .input-tab:hover {
-            background: var(--bg);
-        }
-
-        .input-tab.active {
-            background: var(--primary);
-            color: white;
-        }
-
-        .input-content {
+        /* App Specific Styles */
+        .mode-container {
             display: none;
-        }
-
-        .input-content.active {
-            display: block;
-        }
-
-        /* Text Input */
-        .text-input-area {
-            display: flex;
-            gap: 12px;
-        }
-
-        .text-input-area input {
+            width: 100%;
             flex: 1;
-            padding: 14px 16px;
-            border: 2px solid var(--border);
-            border-radius: 10px;
-            font-size: 16px;
-            transition: border-color 0.2s;
+            /* Grow to fill centered space */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            /* Center content vertically inside */
         }
 
-        .text-input-area input:focus {
-            outline: none;
-            border-color: var(--primary);
+        .mode-container.active {
+            display: flex;
+            /* Changed to flex to support centering */
+            animation: fadeIn 0.3s ease;
         }
 
-        /* Voice Input */
-        .voice-container {
-            text-align: center;
-            padding: 40px;
-        }
-
-        .voice-btn {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            border: none;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            font-size: 36px;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
-        }
-
-        .voice-btn:hover {
-            transform: scale(1.05);
-        }
-
-        .voice-btn.recording {
-            background: var(--danger);
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
             }
 
-            50% {
-                box-shadow: 0 0 0 20px rgba(239, 68, 68, 0);
+            to {
+                opacity: 1;
+                transform: translateY(0);
             }
         }
 
-        .voice-status {
-            margin-top: 16px;
-            color: var(--muted);
-        }
-
-        /* Image Input */
-        .image-drop {
-            border: 2px dashed var(--border);
-            border-radius: 12px;
+        /* Recipe Input */
+        .recipe-input-card {
+            background: var(--card);
+            border-radius: var(--radius-lg);
             padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+            width: 100%;
+            max-width: 800px;
         }
 
-        .image-drop:hover {
-            border-color: var(--primary);
-            background: rgba(16, 185, 129, 0.05);
-        }
-
-        .image-drop-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-        }
-
-        /* Ingredients Input */
         .ingredients-area textarea {
             width: 100%;
-            height: 120px;
-            padding: 14px;
+            height: 150px;
+            padding: 16px;
             border: 2px solid var(--border);
-            border-radius: 10px;
+            border-radius: 12px;
             font-size: 15px;
+            font-family: inherit;
             resize: vertical;
+            background: var(--bg);
+            transition: all 0.2s;
         }
 
         .ingredients-area textarea:focus {
             outline: none;
             border-color: var(--primary);
+            background: #fff;
         }
 
-        /* Action Buttons */
-        .action-btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .action-btn.primary {
-            background: var(--primary);
-            color: white;
-        }
-
-        .action-btn.primary:hover {
-            background: var(--primary-dark);
-        }
-
-        .action-btn.secondary {
-            background: var(--bg);
-            color: var(--text);
+        /* Chat Interface */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 800px;
+            height: 70vh;
+            /* Scaled to viewport */
+            background: var(--card);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
             border: 1px solid var(--border);
         }
 
-        /* Actions Section */
-        .actions-section {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .action-card {
-            background: var(--card);
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: var(--shadow);
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 2px solid transparent;
-        }
-
-        .action-card:hover {
-            transform: translateY(-4px);
-            border-color: var(--primary);
-        }
-
-        .action-card.selected {
-            border-color: var(--primary);
-            background: rgba(16, 185, 129, 0.05);
-        }
-
-        .action-icon {
-            font-size: 40px;
-            margin-bottom: 12px;
-        }
-
-        .action-card h3 {
-            font-size: 18px;
-            margin-bottom: 8px;
-            color: var(--primary);
-        }
-
-        .action-card p {
-            color: var(--muted);
-            font-size: 14px;
-        }
-
-        /* Results Section */
-        .results-section {
-            background: var(--card);
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: var(--shadow);
-            display: none;
-        }
-
-        .results-section.show {
-            display: block;
-        }
-
-        .results-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .results-header h3 {
-            font-size: 20px;
-        }
-
-        .safety-badge {
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .safety-badge.safe {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .safety-badge.warning {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .safety-badge.danger {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        /* Nutrition Grid */
-        .nutrition-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .nutrition-item {
-            background: var(--bg);
-            border-radius: 12px;
-            padding: 16px;
-            text-align: center;
-        }
-
-        .nutrition-icon {
-            font-size: 24px;
-            margin-bottom: 8px;
-        }
-
-        .nutrition-value {
-            font-size: 24px;
-            font-weight: 700;
-        }
-
-        .nutrition-label {
-            font-size: 12px;
-            color: var(--muted);
-        }
-
-        /* Chat Messages */
         .chat-messages {
-            max-height: 400px;
+            flex: 1;
             overflow-y: auto;
-            padding: 16px;
+            padding: 24px;
             background: var(--bg);
-            border-radius: 12px;
-            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
         .chat-message {
-            margin-bottom: 16px;
-            padding: 12px 16px;
-            border-radius: 12px;
             max-width: 80%;
+            padding: 14px 18px;
+            border-radius: 18px;
+            font-size: 15px;
+            line-height: 1.5;
         }
 
         .chat-message.user {
+            align-self: flex-end;
             background: var(--primary);
             color: white;
-            margin-left: auto;
+            border-bottom-right-radius: 4px;
         }
 
         .chat-message.bot {
-            background: var(--card);
+            align-self: flex-start;
+            background: white;
             border: 1px solid var(--border);
+            color: var(--text-main);
+            border-bottom-left-radius: 4px;
         }
 
-        /* Recipe Card */
-        .recipe-card {
-            background: var(--bg);
-            border-radius: 12px;
-            padding: 20px;
+        .chat-input-area {
+            padding: 16px 24px;
+            background: white;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            align-items: center;
         }
 
-        .recipe-card h4 {
-            margin-bottom: 12px;
-            color: var(--primary);
+        .chat-input {
+            flex: 1;
+            border: 2px solid var(--border);
+            border-radius: 100px;
+            padding: 12px 20px;
+            font-size: 15px;
+            transition: all 0.2s;
         }
 
-        .recipe-card ul {
-            padding-left: 20px;
-            margin-bottom: 16px;
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
-        .recipe-card li {
-            margin: 6px 0;
+        .send-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .recipe-card ol {
-            padding-left: 20px;
-        }
-
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 40px;
+        /* Recipe Result Card */
+        .recipe-result {
+            background: white;
+            border-radius: var(--radius-md);
+            padding: 24px;
+            margin-top: 24px;
+            border-left: 4px solid var(--primary);
+            box-shadow: var(--shadow-sm);
+            width: 100%;
+            max-width: 800px;
         }
 
         .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border);
-            border-top-color: var(--primary);
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--primary-soft);
             border-radius: 50%;
+            border-top-color: var(--primary);
             animation: spin 1s linear infinite;
-            margin: 0 auto 16px;
+            margin: 20px auto;
         }
 
         @keyframes spin {
@@ -444,295 +180,161 @@
                 transform: rotate(360deg);
             }
         }
-
-        /* Hidden file input */
-        #imageInput {
-            display: none;
-        }
     </style>
 </head>
 
 <body>
-    <div class="header">
-        <h1>🥗 AI Nutrition</h1>
-        <div class="header-right">
-            <span class="user-badge" id="userBadge">User</span>
-            <button class="logout-btn" onclick="logout()">Logout</button>
-        </div>
-    </div>
-
-    <div class="container">
-        <!-- Input Section -->
-        <div class="input-section">
-            <div class="input-tabs">
-                <button id="tab-text" class="input-tab active" onclick="switchInput('text')">📝 Text</button>
-                <button id="tab-voice" class="input-tab" onclick="switchInput('voice')">🎤 Voice</button>
-                <button id="tab-image" class="input-tab" onclick="switchInput('image')">📷 Image</button>
-                <button id="tab-ingredients" class="input-tab" onclick="switchInput('ingredients')">🥕
-                    Ingredients</button>
+    <div class="app-shell">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="logo" onclick="location.href='index.html'">
+                <div class="logo-icon">🥗</div>
+                <h1>Nutrition<span>AI</span></h1>
             </div>
 
-            <!-- Text Input -->
-            <div class="input-content active" id="textInput">
-                <div class="text-input-area">
-                    <input type="text" id="textField" placeholder="Describe your food or ask a question...">
-                    <button class="action-btn primary" onclick="submitText()">Send</button>
+            <div class="nav-sections">
+                <a class="nav-item" href="dashboard.html"><i class="icon">🏠</i> Dashboard</a>
+                <a class="nav-item" href="dashboard.html"><i class="icon">📅</i> Weekly Plan</a>
+                <a class="nav-item" href="food-scan.html"><i class="icon">📸</i> Food Scan</a>
+                <a class="nav-item" href="upload.html"><i class="icon">📄</i> Reports</a>
+                <a class="nav-item" id="navRecipe" href="app.html?mode=recipe"><i class="icon">🍳</i> Recipes</a>
+                <a class="nav-item" id="navAnalyze" href="app.html?mode=analyze"><i class="icon">💬</i> Nutrient
+                    Chat</a>
+            </div>
+
+            <div class="nav-footer">
+                <div class="nav-item" onclick="handleLogout()" style="color: var(--danger);">
+                    <i class="icon">🚪</i> Logout
                 </div>
             </div>
+        </nav>
 
-            <!-- Voice Input -->
-            <div class="input-content" id="voiceInput">
-                <div class="voice-container">
-                    <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()">🎤</button>
-                    <p class="voice-status" id="voiceStatus">Click to start speaking</p>
+        <!-- Main Content -->
+        <div class="main-container">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="breadcrumbs">
+                    <span class="text-muted">App /</span>
+                    <span class="current" id="pageTitle">...</span>
                 </div>
-            </div>
-
-            <!-- Image Input -->
-            <div class="input-content" id="imageInput">
-                <div class="image-drop" id="imageDrop" onclick="document.getElementById('imageFile').click()">
-                    <div class="image-drop-icon">📸</div>
-                    <p>Click or drag to upload food image</p>
+                <div class="user-profile">
+                    <div class="avatar">U</div>
+                    <span class="username" id="userNameDisplay">User</span>
                 </div>
-                <input type="file" id="imageFile" accept="image/*" onchange="handleImage(this)">
-            </div>
+            </header>
 
-            <!-- Ingredients Input -->
-            <div class="input-content" id="ingredientsInput">
-                <div class="ingredients-area">
-                    <textarea id="ingredientsField"
-                        placeholder="Enter ingredients, one per line:&#10;2 eggs&#10;100g chicken&#10;1 cup rice..."></textarea>
-                    <div style="margin-top: 12px; display: flex; gap: 12px;">
-                        <button class="action-btn primary" onclick="generateRecipe()">🍳 Generate Recipe</button>
+            <main class="content-body single-col">
+
+                <!-- Recipe Mode -->
+                <div id="mode-recipe" class="mode-container">
+                    <div class="recipe-input-card" style="text-align: center;">
+                        <div style="font-size: 40px; margin-bottom: 16px;">🍳</div>
+                        <h2 style="font-size: 24px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">
+                            Smart Recipe Generator</h2>
+                        <p style="color: var(--text-muted); margin-bottom: 32px;">
+                            Enter the ingredients you have, and AI will create a healthy recipe for you.
+                        </p>
+
+                        <div class="ingredients-area" style="text-align: left;">
+                            <label
+                                style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">Your
+                                Ingredients</label>
+                            <textarea id="ingredientsField"
+                                placeholder="Enter ingredients, one per line:&#10;2 eggs&#10;100g chicken breast&#10;1 cup rice&#10;Spinach..."></textarea>
+                            <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                                <button class="upload-btn" onclick="generateRecipe()"
+                                    style="width: 100%; padding: 16px; font-size: 16px;">Generate Recipe ✨</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="recipeResults"></div>
+                </div>
+
+                <!-- Analyze/Coach Mode -->
+                <div id="mode-analyze" class="mode-container">
+                    <div class="chat-container">
+                        <!-- Centered Header Inside Card -->
+                        <div
+                            style="padding: 40px; text-align: center; border-bottom: 1px solid var(--border); background: #fff;">
+                            <div style="font-size: 40px; margin-bottom: 16px;">💬</div>
+                            <h2 style="font-size: 24px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">
+                                Nutrient Chat</h2>
+                            <p style="color: var(--text-muted); margin: 0;">Ask about food nutrients and get instant
+                                analysis.</p>
+                        </div>
+
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="chat-message bot">
+                                Hello! I'm your personal AI Nutrition Coach. How can I help you today?
+                            </div>
+                        </div>
+                        <div class="chat-input-area">
+                            <input type="text" id="textField" class="chat-input"
+                                placeholder="Ask about your diet, calories, or health..."
+                                onkeypress="handleEnter(event)">
+                            <button class="send-btn" onclick="submitText()">➤</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Action Cards -->
-        <div class="actions-section">
-            <div id="card-analyze" class="action-card" onclick="selectAction('scan')">
-                <div class="action-icon">📊</div>
-                <h3>Analyze Food</h3>
-                <p>Get nutrition info and safety check</p>
-            </div>
-            <div id="card-fix" class="action-card" onclick="selectAction('fix')">
-                <div class="action-icon">🔧</div>
-                <h3>Fix My Meal</h3>
-                <p>Get healthier alternatives</p>
-            </div>
-            <div id="card-recipe" class="action-card" onclick="selectAction('recipe')">
-                <div class="action-icon">📖</div>
-                <h3>Generate Recipe</h3>
-                <p>Create recipe from ingredients</p>
-            </div>
-            <div id="card-coach" class="action-card" onclick="selectAction('coach')">
-                <div class="action-icon">💬</div>
-                <h3>AI Coach</h3>
-                <p>Ask nutrition questions</p>
-            </div>
-        </div>
-
-        <!-- Results Section -->
-        <div class="results-section" id="resultsSection">
-            <div class="results-header">
-                <h3 id="resultsTitle">Results</h3>
-                <span class="safety-badge safe" id="safetyBadge">✓ Safe</span>
-            </div>
-            <div id="resultsContent">
-                <!-- Dynamic content -->
-            </div>
+            </main>
         </div>
     </div>
 
     <script>
         const API_BASE = '';
         const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
 
         if (!token) window.location.href = 'login.html';
-        document.getElementById('userBadge').textContent = localStorage.getItem('user_name') || 'User';
 
-        let selectedAction = 'scan';
-        let recognition = null;
+        if (user) {
+            try {
+                const userData = JSON.parse(user);
+                document.getElementById('userNameDisplay').textContent = userData.name || 'User';
+                document.querySelector('.avatar').textContent = (userData.name || 'U').charAt(0).toUpperCase();
+            } catch (e) { }
+        }
 
-        // Handle Query Params
+        function handleLogout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // Mode Switching Logic
         const urlParams = new URLSearchParams(window.location.search);
-        const mode = urlParams.get('mode');
+        const mode = urlParams.get('mode') || 'recipe'; // Default to recipe
 
-        if (mode === 'recipe') {
-            switchInput('ingredients');
-            selectAction('recipe');
+        function setMode(activeMode) {
+            // Hide all containers
+            document.querySelectorAll('.mode-container').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
-            // Hide other tabs
-            document.getElementById('tab-text').style.display = 'none';
-            document.getElementById('tab-voice').style.display = 'none';
-            document.getElementById('tab-image').style.display = 'none';
-
-            // Hide other cards
-            document.getElementById('card-analyze').style.display = 'none';
-            document.getElementById('card-fix').style.display = 'none';
-            document.getElementById('card-coach').style.display = 'none';
-
-        } else if (mode === 'analyze') {
-            switchInput('text');
-            selectAction('coach'); // Coach/Analyze logic
-
-            // Hide recipe tab
-            document.getElementById('tab-ingredients').style.display = 'none';
-
-            // Hide recipe and fix cards
-            const cardRecipe = document.getElementById('card-recipe');
-            if (cardRecipe) cardRecipe.style.display = 'none';
-
-            const cardFix = document.getElementById('card-fix');
-            if (cardFix) cardFix.style.display = 'none';
-
-            // Also hide Analyze and Coach cards as they are redundant in this mode
-            const cardAnalyze = document.getElementById('card-analyze');
-            if (cardAnalyze) cardAnalyze.style.display = 'none';
-
-            const cardCoach = document.getElementById('card-coach');
-            if (cardCoach) cardCoach.style.display = 'none';
-
-        } else if (mode === 'fix') {
-            switchInput('image');
-            selectAction('fix');
-        }
-
-        // Input Tab Switching
-        function switchInput(type) {
-            document.querySelectorAll('.input-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.input-content').forEach(c => c.classList.remove('active'));
-
-            const tab = document.getElementById('tab-' + type);
-            if (tab) tab.classList.add('active');
-
-            const content = document.getElementById(type + 'Input');
-            if (content) content.classList.add('active');
-        }
-
-        // Action Selection
-        function selectAction(action) {
-            selectedAction = action;
-            document.querySelectorAll('.action-card').forEach(c => c.classList.remove('selected'));
-
-            // Find the card by ID and select it
-            const cardId = 'card-' + (action === 'scan' ? 'analyze' : action);
-            // Note: 'scan' maps to 'card-analyze' based on previous HTML
-
-            const card = document.getElementById(cardId);
-            if (card) {
-                card.classList.add('selected');
+            if (activeMode === 'recipe') {
+                document.getElementById('mode-recipe').classList.add('active');
+                document.getElementById('navRecipe').classList.add('active');
+                document.getElementById('pageTitle').textContent = 'Recipe Generator';
+            } else {
+                document.getElementById('mode-analyze').classList.add('active');
+                document.getElementById('navAnalyze').classList.add('active');
+                document.getElementById('pageTitle').textContent = 'Nutrient Chat';
             }
         }
 
-        // Text Submit - Backend handles RAG (auto-fetches food context)
-        async function submitText() {
-            const text = document.getElementById('textField').value.trim();
-            if (!text) return;
+        setMode(mode);
 
-            showLoading();
-
-            try {
-                // Send message - Backend will auto-fetch food context via RAG
-                const payload = { message: text };
-
-                console.log('[CHAT] Sending message (backend handles RAG):', text);
-
-                const response = await fetch(`${API_BASE}/api/coach/chat`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-                showCoachResponse(text, data);
-            } catch (err) {
-                showError(err.message);
-            }
-        }
-
-        // Voice Input
-        function toggleVoice() {
-            if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-                alert('Voice input not supported in this browser');
-                return;
-            }
-
-            const btn = document.getElementById('voiceBtn');
-            const status = document.getElementById('voiceStatus');
-
-            if (recognition && btn.classList.contains('recording')) {
-                recognition.stop();
-                btn.classList.remove('recording');
-                status.textContent = 'Click to start speaking';
-                return;
-            }
-
-            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.continuous = false;
-            recognition.lang = 'en-US';
-
-            recognition.onstart = () => {
-                btn.classList.add('recording');
-                status.textContent = 'Listening...';
-            };
-
-            recognition.onresult = (e) => {
-                const text = e.results[0][0].transcript;
-                status.textContent = `Heard: "${text}"`;
-                document.getElementById('textField').value = text;
-                setTimeout(() => submitText(), 500);
-            };
-
-            recognition.onerror = (e) => {
-                status.textContent = 'Error: ' + e.error;
-                btn.classList.remove('recording');
-            };
-
-            recognition.onend = () => {
-                btn.classList.remove('recording');
-            };
-
-            recognition.start();
-        }
-
-        // Image Upload
-        async function handleImage(input) {
-            if (!input.files[0]) return;
-
-            showLoading();
-
-            const formData = new FormData();
-            formData.append('file', input.files[0]);
-
-            try {
-                const response = await fetch(`${API_BASE}/api/food/upload`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    showNutritionResults(data);
-                } else {
-                    throw new Error(data.detail || 'Upload failed');
-                }
-            } catch (err) {
-                showError(err.message);
-            }
-        }
-
-        // Generate Recipe
+        // --- Recipe Logic ---
         async function generateRecipe() {
             const ingredients = document.getElementById('ingredientsField').value.trim();
-            if (!ingredients) return;
+            if (!ingredients) {
+                alert('Please enter some ingredients first!');
+                return;
+            }
 
-            showLoading();
+            const resultsDiv = document.getElementById('recipeResults');
+            resultsDiv.innerHTML = '<div class="spinner"></div><p style="text-align:center; color: var(--text-muted);">Creating a delicious recipe...</p>';
 
             try {
                 const response = await fetch(`${API_BASE}/api/recipe/generate`, {
@@ -745,182 +347,100 @@
                 });
 
                 const data = await response.json();
+
                 if (response.ok) {
-                    showRecipeResults(data);
+                    // Format Recipe Output
+                    let html = `<div class="recipe-result">`;
+
+                    // Attempt to parse markdown-like structure if backend returns raw text
+                    // Or expect structured JSON. Assuming JSON based on previous code:
+                    if (data.recipe_name) {
+                        html += `<h3>${data.recipe_name}</h3>`;
+                    }
+                    if (data.ingredients) {
+                        html += `<h4>Ingredients</h4><ul>`;
+                        data.ingredients.forEach(i => html += `<li>${i}</li>`);
+                        html += `</ul>`;
+                    }
+                    if (data.instructions) {
+                        html += `<h4>Instructions</h4><ol>`;
+                        data.instructions.forEach(step => html += `<li>${step}</li>`);
+                        html += `</ol>`;
+                    }
+
+                    // Fallback for raw text response
+                    if (!data.recipe_name && data.response) {
+                        html += `<div style="white-space: pre-wrap;">${data.response}</div>`;
+                    }
+
+                    html += `</div>`;
+                    resultsDiv.innerHTML = html;
                 } else {
                     throw new Error(data.detail || 'Recipe generation failed');
                 }
             } catch (err) {
-                showError(err.message);
+                resultsDiv.innerHTML = `<div style="padding: 20px; background: #fee2e2; color: #b91c1c; border-radius: 12px; text-align: center;">Error: ${err.message}</div>`;
             }
         }
 
-        // Display Functions
-        function showLoading() {
-            const results = document.getElementById('resultsSection');
-            const content = document.getElementById('resultsContent');
-            results.classList.add('show');
-            content.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Processing...</p>
-                </div>
-            `;
-        }
 
-        function showError(message) {
-            const results = document.getElementById('resultsSection');
-            const content = document.getElementById('resultsContent');
-            document.getElementById('resultsTitle').textContent = 'Error';
-            document.getElementById('safetyBadge').className = 'safety-badge danger';
-            document.getElementById('safetyBadge').textContent = '✗ Error';
-            content.innerHTML = `<p style="color: var(--danger);">${message}</p>`;
-            results.classList.add('show');
-        }
-
-        function showCoachResponse(question, data) {
-            const results = document.getElementById('resultsSection');
-            const content = document.getElementById('resultsContent');
-
-            // Hide the redundant header in Coach mode
-            const header = document.querySelector('.results-header');
-            if (header) header.style.display = 'none';
-
-            content.innerHTML = `
-                <div class="chat-messages">
-                    <div class="chat-message user">${question}</div>
-                    <div class="chat-message bot">${data.message}</div>
-                </div>
-            `;
-            results.classList.add('show');
-        }
-
-        function showNutritionResults(data) {
-            const results = document.getElementById('resultsSection');
-            const content = document.getElementById('resultsContent');
-            document.getElementById('resultsTitle').textContent = 'Food Analysis';
-
-            const badge = document.getElementById('safetyBadge');
-            const verdict = data.safety?.verdict || 'safe';
-            badge.className = 'safety-badge ' + verdict;
-            badge.textContent = verdict === 'safe' ? '✓ Safe' : verdict === 'warning' ? '⚠ Caution' : '✗ Warning';
-
-            const n = data.nutrition || {};
-            const confidence = data.confidence ? Math.round(data.confidence * 100) : 0;
-            content.innerHTML = `
-                <div style="text-align: center; margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); border-radius: 16px; color: white;">
-                    <div style="font-size: 48px; margin-bottom: 8px;">🍽️</div>
-                    <h2 style="font-size: 28px; margin-bottom: 8px;">${data.food_name || 'Unknown Food'}</h2>
-                    <div style="display: flex; justify-content: center; gap: 16px; font-size: 14px; opacity: 0.9;">
-                        <span>📊 ${confidence}% confidence</span>
-                        <span>📡 Source: ${data.source || 'model'}</span>
-                    </div>
-                </div>
-                <div class="nutrition-grid">
-                    <div class="nutrition-item">
-                        <div class="nutrition-icon">🔥</div>
-                        <div class="nutrition-value">${Math.round(n.calories) || 0}</div>
-                        <div class="nutrition-label">Calories</div>
-                    </div>
-                    <div class="nutrition-item">
-                        <div class="nutrition-icon">🥩</div>
-                        <div class="nutrition-value">${Math.round(n.protein_g) || 0}g</div>
-                        <div class="nutrition-label">Protein</div>
-                    </div>
-                    <div class="nutrition-item">
-                        <div class="nutrition-icon">🍞</div>
-                        <div class="nutrition-value">${Math.round(n.carbs_g) || 0}g</div>
-                        <div class="nutrition-label">Carbs</div>
-                    </div>
-                    <div class="nutrition-item">
-                        <div class="nutrition-icon">🧈</div>
-                        <div class="nutrition-value">${Math.round(n.fat_g) || 0}g</div>
-                        <div class="nutrition-label">Fat</div>
-                    </div>
-                    <div class="nutrition-item">
-                        <div class="nutrition-icon">🍬</div>
-                        <div class="nutrition-value">${Math.round(n.sugar_g) || 0}g</div>
-                        <div class="nutrition-label">Sugar</div>
-                    </div>
-                    <div class="nutrition-item">
-                        <div class="nutrition-icon">🧂</div>
-                        <div class="nutrition-value">${Math.round(n.sodium_mg) || 0}mg</div>
-                        <div class="nutrition-label">Sodium</div>
-                    </div>
-                </div>
-                ${data.safety?.violations?.length ? `
-                    <div style="margin-top: 16px;">
-                        <h4 style="color: var(--warning); margin-bottom: 12px;">⚠️ Warnings</h4>
-                        ${data.safety.violations.map(v => `
-                            <div style="background: #fef3c7; padding: 12px; border-radius: 8px; margin-bottom: 8px;">
-                                <strong>${v.rule_id}</strong>: ${v.message}
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-            `;
-            results.classList.add('show');
-        }
-
-        function showRecipeResults(data) {
-            const results = document.getElementById('resultsSection');
-            const content = document.getElementById('resultsContent');
-
-            // Ensure data is an object
-            let recipe = data;
-            if (typeof data === 'string') {
-                try {
-                    recipe = JSON.parse(data);
-                } catch (e) {
-                    console.error("Failed to parse recipe JSON", e);
-                }
-            }
-
-            // Handle if the recipe is nested under a 'recipe' key
-            if (recipe.recipe) recipe = recipe.recipe;
-
-            document.getElementById('resultsTitle').textContent = recipe.recipe_name || 'Generated Recipe';
-
-            // Show header for recipes
-            const header = document.querySelector('.results-header');
-            if (header) header.style.display = 'flex';
-
-            const badge = document.getElementById('safetyBadge');
-            badge.className = 'safety-badge safe';
-            badge.textContent = '✓ Safe Recipe';
-
-            // Safe access to arrays
-            const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
-            const instructions = Array.isArray(recipe.instructions) ? recipe.instructions : [];
-
-            content.innerHTML = `
-                <div class="recipe-card">
-                    <h4>Ingredients</h4>
-                    <ul>
-                        ${ingredients.map(i => `<li>${i}</li>`).join('')}
-                    </ul>
-                    <h4>Instructions</h4>
-                    <ol>
-                        ${instructions.map(i => `<li>${i}</li>`).join('')}
-                    </ol>
-                    ${recipe.nutrition ? `
-                        <h4 style="margin-top: 16px;">Estimated Nutrition</h4>
-                        <p>Calories: ${recipe.nutrition.calories || '--'} | Protein: ${recipe.nutrition.protein_g || '--'}g | Carbs: ${recipe.nutrition.carbs_g || '--'}g</p>
-                    ` : ''}
-                </div>
-            `;
-            results.classList.add('show');
-        }
-
-        function logout() {
-            localStorage.clear();
-            window.location.href = 'login.html';
-        }
-
-        // Enter key submit
-        document.getElementById('textField').addEventListener('keypress', (e) => {
+        // --- Chat/Coach Logic ---
+        function handleEnter(e) {
             if (e.key === 'Enter') submitText();
-        });
+        }
+
+        function appendMessage(text, sender) {
+            const container = document.getElementById('chatMessages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `chat-message ${sender}`;
+            msgDiv.textContent = text;
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function submitText() {
+            const input = document.getElementById('textField');
+            const text = input.value.trim();
+            if (!text) return;
+
+            appendMessage(text, 'user');
+            input.value = '';
+
+            // Show temporary typing indicator
+            const loadingId = 'loading-' + Date.now();
+            const container = document.getElementById('chatMessages');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'chat-message bot';
+            loadingDiv.id = loadingId;
+            loadingDiv.textContent = '...';
+            container.appendChild(loadingDiv);
+            container.scrollTop = container.scrollHeight;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/coach/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ message: text })
+                });
+
+                const data = await response.json();
+
+                // Remove loading
+                document.getElementById(loadingId).remove();
+
+                if (response.ok) {
+                    appendMessage(data.message || data.response, 'bot');
+                } else {
+                    appendMessage("Sorry, I encountered an error. Please try again.", 'bot');
+                }
+            } catch (err) {
+                document.getElementById(loadingId).remove();
+                appendMessage("Network error. Please check your connection.", 'bot');
+            }
+        }
     </script>
 </body>
 
